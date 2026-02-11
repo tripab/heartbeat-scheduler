@@ -1,16 +1,15 @@
 package org.heartbeat.scheduler.vthread;
 
+import java.util.Objects;
+
 /**
  * Scoped continuation support for Heartbeat tasks.
  * Wraps the concept of a continuation scope.
- * 
+ * <p>
  * In the paper's terminology, this represents the scope in which
  * parallel computations can yield and be promoted.
  */
-public class ContinuationScope {
-    private final String name;
-    private final ContinuationScope parent;
-
+public record ContinuationScope(String name, ContinuationScope parent) {
     /**
      * Create a new continuation scope with the given name.
      */
@@ -22,25 +21,25 @@ public class ContinuationScope {
      * Create a new continuation scope with a parent scope.
      * Allows for nested scopes.
      */
-    public ContinuationScope(String name, ContinuationScope parent) {
+    public ContinuationScope {
         if (name == null || name.isEmpty()) {
             throw new IllegalArgumentException("Scope name cannot be null or empty");
         }
-        this.name = name;
-        this.parent = parent;
     }
 
     /**
      * Get the name of this scope.
      */
-    public String getName() {
+    @Override
+    public String name() {
         return name;
     }
 
     /**
      * Get the parent scope, or null if this is a root scope.
      */
-    public ContinuationScope getParent() {
+    @Override
+    public ContinuationScope parent() {
         return parent;
     }
 
@@ -69,18 +68,10 @@ public class ContinuationScope {
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
-        if (!(obj instanceof ContinuationScope)) return false;
-        
-        ContinuationScope other = (ContinuationScope) obj;
-        return name.equals(other.name) && 
-               (parent == null ? other.parent == null : parent.equals(other.parent));
-    }
+        if (!(obj instanceof ContinuationScope other)) return false;
 
-    @Override
-    public int hashCode() {
-        int result = name.hashCode();
-        result = 31 * result + (parent != null ? parent.hashCode() : 0);
-        return result;
+        return name.equals(other.name) &&
+                (Objects.equals(parent, other.parent));
     }
 
     /**
