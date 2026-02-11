@@ -4,12 +4,13 @@ A Java implementation of Heartbeat Scheduling using Virtual Threads (Project Loo
 
 ## Overview
 
-Heartbeat Scheduling is a provably efficient scheduling technique for nested parallel programs that delivers bounded overhead without manual tuning. This implementation uses Java 21+ virtual threads and continuations.
+Heartbeat Scheduling is a provably efficient scheduling technique for nested parallel programs that delivers bounded
+overhead without manual tuning. This implementation uses Java 21+ virtual threads and continuations.
 
 ### Key Features
 
 - **Provable bounds**: Work overhead ≤ (1 + τ/N) × sequential work
-- **Preserved parallelism**: Span ≤ (1 + N/τ) × fully-parallel span  
+- **Preserved parallelism**: Span ≤ (1 + N/τ) × fully-parallel span
 - **No manual tuning**: Automatic granularity control
 - **Virtual threads**: Lightweight threading with millions of threads possible
 - **Continuation-based**: Explicit stack control via Project Loom
@@ -32,17 +33,100 @@ mvn test
 ```
 
 ## Project Structure
-Coming up!
 
-## Phase 1 - Targted Features
+```
+src/main/java/org/heartbeat/
+├── core/               # Core scheduler components
+│   ├── HeartbeatConfig.java
+│   ├── HeartbeatTimer.java
+│   ├── HeartbeatContext.java
+│   ├── PollingStrategy.java
+│   ├── CountBasedPolling.java
+│   └── TimeBasedPolling.java
+├── vthread/            # Virtual thread support
+│   ├── ContinuationScope.java
+│   └── HeartbeatContinuation.java
+├── task/               # Task API
+│   └── HeartbeatTask.java
+├── sync/               # Synchronization primitives
+│   ├── JoinCounter.java
+│   └── PromotionPoint.java
+└── util/               # Utilities
+    └── TimingCalibration.java
+```
 
-**Phase 1: Core Abstractions** (Complete)
+## What's implemented until now
+
+**Phase 1: Core Abstractions**
+
 - HeartbeatConfig with builder pattern
 - ContinuationScope wrapper
 - HeartbeatContinuation for yield/resume
 - HeartbeatTask base class
 - JoinCounter for fork-join coordination
 - PromotionPoint for tracking promotable frames
+
+**Phase 2: Timing and Polling**
+
+- HeartbeatTimer with calibration
+- PollingStrategy abstraction
+- CountBasedPolling implementation
+- TimeBasedPolling implementation
+- TimingCalibration utilities
+- HeartbeatContext for thread-local state
+
+## Configuration
+
+### Creating a Configuration
+
+```java
+// Default configuration (30μs heartbeat, 1.5μs promotion cost, 5% overhead)
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+                .build();
+
+// Custom configuration
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+        .heartbeatPeriodMicros(50)  // 50μs heartbeat
+        .promotionCostMicros(2)      // 2μs promotion cost
+        .numCarrierThreads(8)        // 8 platform threads
+        .enableStatistics(true)
+        .build();
+
+// Target specific overhead percentage
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+        .promotionCostMicros(2)
+        .targetOverheadPercent(3.0)  // 3% overhead (N = 100/3 * τ ≈ 67μs)
+        .build();
+```
+
+### Calibration
+
+```java
+// Run calibration to determine optimal parameters
+CalibrationResults results = TimingCalibration.calibrateAndPrint();
+
+// Use calibration results
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+        .promotionCostNanos(results.promotionCost)
+        .heartbeatPeriodNanos(results.recommendedHeartbeatPeriod)
+        .build();
+```
+
+## Usage (Phase 1 & 2 as of now)
+
+```java
+// Create a task
+HeartbeatTask<Integer> task = new HeartbeatTask<>() {
+            @Override
+            protected Integer compute() {
+                // Your computation here
+                return 42;
+            }
+        };
+
+// Execute task
+Integer result = task.call();
+```
 
 ## Implementation Details
 
@@ -60,10 +144,10 @@ The core heartbeat mechanism:
 For heartbeat period N and promotion cost τ:
 
 - **Work bound**: W ≤ (1 + τ/N) × w
-  - Example: N = 20τ → overhead = 5%
-  
-- **Span bound**: S ≤ (1 + N/τ) × s  
-  - Example: N = 20τ → span increase = 21×
+    - Example: N = 20τ → overhead = 5%
+
+- **Span bound**: S ≤ (1 + N/τ) × s
+    - Example: N = 20τ → span increase = 21×
 
 ### Virtual Threads Benefits
 
@@ -82,6 +166,14 @@ mvn clean test jacoco:report
 
 View coverage report: `target/site/jacoco/index.html`
 
+## Next Steps
+
+### Phase 3: Frame Management
+
+- PromotionTracker with doubly-linked list
+- Frame lifecycle management
+- Thread-safe promotable frame tracking
+
 ## References
 
 - [Heartbeat Scheduling Paper](https://www.andrew.cmu.edu/user/mrainey/papers/heartbeat.pdf)
@@ -89,9 +181,11 @@ View coverage report: `target/site/jacoco/index.html`
 - [Virtual Threads (JEP 444)](https://openjdk.org/jeps/444)
 
 ## License
+
 This is an educational implementation of the Heartbeat Scheduling algorithm.
 
 ## Authors
+
 Implementation based on the paper:
 *Heartbeat Scheduling: Provable Efficiency for Nested Parallelism*  
 Umut A. Acar, Arthur Charguéraud, Adrien Guatto, Mike Rainey, Filip Sieczkowski  
