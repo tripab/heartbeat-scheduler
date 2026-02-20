@@ -39,13 +39,25 @@ class ForkJoinIntegrationTest {
 
     static class AddTask extends HeartbeatTask<Integer> {
         private final int a, b;
-        AddTask(int a, int b) { this.a = a; this.b = b; }
-        @Override protected Integer compute() { return a + b; }
+
+        AddTask(int a, int b) {
+            this.a = a;
+            this.b = b;
+        }
+
+        @Override
+        protected Integer compute() {
+            return a + b;
+        }
     }
 
     static class FibTask extends HeartbeatTask<Long> {
         private final int n;
-        FibTask(int n) { this.n = n; }
+
+        FibTask(int n) {
+            this.n = n;
+        }
+
         @Override
         protected Long compute() {
             if (n <= 1) return (long) n;
@@ -60,9 +72,14 @@ class ForkJoinIntegrationTest {
     static class SumTask extends HeartbeatTask<Long> {
         private final int[] array;
         private final int start, end, threshold;
+
         SumTask(int[] array, int start, int end, int threshold) {
-            this.array = array; this.start = start; this.end = end; this.threshold = threshold;
+            this.array = array;
+            this.start = start;
+            this.end = end;
+            this.threshold = threshold;
         }
+
         @Override
         protected Long compute() {
             if (end - start <= threshold) {
@@ -76,6 +93,28 @@ class ForkJoinIntegrationTest {
             fork(left);
             fork(right);
             return join(left) + join(right);
+        }
+    }
+
+    // Nested fork-join
+    static class NestedTask extends HeartbeatTask<Integer> {
+        private final int depth;
+
+        NestedTask(int depth) {
+            this.depth = depth;
+        }
+
+        @Override
+        protected Integer compute() {
+            if (depth <= 0) return 1;
+
+            NestedTask t1 = new NestedTask(depth - 1);
+            NestedTask t2 = new NestedTask(depth - 1);
+
+            fork(t1);
+            fork(t2);
+
+            return join(t1) + join(t2);
         }
     }
 
@@ -111,6 +150,14 @@ class ForkJoinIntegrationTest {
 
         Integer result = executor.submit(task);
         assertThat(result).isEqualTo(10);
+    }
+
+    @Test
+    void testNestedForkJoin() throws Exception {
+        // 2^depth tasks
+        Integer result = executor.submit(new NestedTask(5));
+
+        assertThat(result).isEqualTo(32); // 2^5 = 32
     }
 
     @Test

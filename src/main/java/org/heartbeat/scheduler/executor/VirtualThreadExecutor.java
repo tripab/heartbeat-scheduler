@@ -4,14 +4,10 @@ import org.heartbeat.scheduler.core.CountBasedPolling;
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.core.HeartbeatContext;
 import org.heartbeat.scheduler.core.PollingStrategy;
-import org.heartbeat.scheduler.core.PromotionTracker;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -33,6 +29,7 @@ public class VirtualThreadExecutor {
     // Statistics
     private final AtomicLong totalTasksExecuted = new AtomicLong();
     private final AtomicLong totalPromotions = new AtomicLong();
+    private final AtomicInteger activeVirtualThreads;
 
     public VirtualThreadExecutor(HeartbeatConfig config) {
         if (config == null) {
@@ -41,6 +38,7 @@ public class VirtualThreadExecutor {
         this.config = config;
         this.virtualThreadPool = Executors.newVirtualThreadPerTaskExecutor();
         this.shutdown = false;
+        this.activeVirtualThreads = new AtomicInteger(0);
     }
 
     /**
@@ -144,6 +142,18 @@ public class VirtualThreadExecutor {
         return virtualThreadPool.awaitTermination(timeout, unit);
     }
 
+    public int getActiveVirtualThreads() {
+        return activeVirtualThreads.get();
+    }
+
+    public long getTotalPromotionsPerformed() {
+        return totalPromotions.get();
+    }
+
+    public long getTotalTasksExecuted() {
+        return totalTasksExecuted.get();
+    }
+
     public boolean isShutdown() {
         return shutdown;
     }
@@ -152,10 +162,15 @@ public class VirtualThreadExecutor {
         return config;
     }
 
+    /**
+     * Get statistics for this executor.
+     */
     public ExecutorStatistics getStatistics() {
         return new ExecutorStatistics(
                 totalTasksExecuted.get(),
-                totalPromotions.get()
+                totalPromotions.get(),
+                activeVirtualThreads.get(),
+                shutdown
         );
     }
 
@@ -164,20 +179,41 @@ public class VirtualThreadExecutor {
         return new HeartbeatContext(config, polling);
     }
 
+    /**
+     * Immutable snapshot of executor statistics.
+     */
     public static class ExecutorStatistics {
         public final long totalTasksExecuted;
-        public final long totalPromotions;
+        public final long totalPromotionsPerformed;
+        public final int activeVirtualThreads;
+        public final boolean shutdown;
 
-        ExecutorStatistics(long totalTasksExecuted, long totalPromotions) {
+        private ExecutorStatistics(
+                long totalTasksExecuted,
+                long totalPromotionsPerformed,
+                int activeVirtualThreads,
+                boolean shutdown
+        ) {
             this.totalTasksExecuted = totalTasksExecuted;
-            this.totalPromotions = totalPromotions;
+            this.totalPromotionsPerformed = totalPromotionsPerformed;
+            this.activeVirtualThreads = activeVirtualThreads;
+            this.shutdown = shutdown;
+        }
+
+        public double getPromotionRate() {
+            return totalTasksExecuted > 0
+                    ? (double) totalPromotionsPerformed / totalTasksExecuted
+                    : 0.0;
         }
 
         @Override
         public String toString() {
             return String.format(
-                    "ExecutorStatistics[tasks=%d, promotions=%d]",
-                    totalTasksExecuted, totalPromotions
+                    "ExecutorStatistics[tasks=%d, promotions=%d, active=%d, rate=%.2f%%]",
+                    totalTasksExecuted,
+                    totalPromotionsPerformed,
+                    activeVirtualThreads,
+                    getPromotionRate() * 100.0
             );
         }
     }
