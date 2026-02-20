@@ -5,7 +5,7 @@ A Java implementation of Heartbeat Scheduling using Virtual Threads (Project Loo
 ## Overview
 
 Heartbeat Scheduling is a provably efficient scheduling technique for nested parallel programs that delivers bounded
-overhead without manual tuning. This implementation uses Java 21+ virtual threads and continuations.
+overhead without manual tuning. This implementation uses Java 25+ virtual threads and continuations.
 
 ### Key Features
 
@@ -17,7 +17,7 @@ overhead without manual tuning. This implementation uses Java 21+ virtual thread
 
 ## Requirements
 
-- **Java 21 or later** (for virtual threads and Continuations API)
+- **Java 25 or later** (for virtual threads and Continuations API)
 - Maven 3.6+ (for building)
 
 ## Building
@@ -35,12 +35,13 @@ mvn test
 ## Project Structure
 
 ```
-src/main/java/org/heartbeat/
+src/main/java/org/heartbeat/scheduler
 ├── core/               # Core scheduler components
 │   ├── HeartbeatConfig.java
 │   ├── HeartbeatTimer.java
 │   ├── HeartbeatContext.java
 │   ├── PollingStrategy.java
+│   ├── PromotionTracker.java
 │   ├── CountBasedPolling.java
 │   └── TimeBasedPolling.java
 ├── vthread/            # Virtual thread support
@@ -53,6 +54,7 @@ src/main/java/org/heartbeat/
 │   └── PromotionPoint.java
 └── util/               # Utilities
     └── TimingCalibration.java
+    └── SimpleCalibration.java
 ```
 
 ## What's implemented until now
@@ -74,6 +76,14 @@ src/main/java/org/heartbeat/
 - TimeBasedPolling implementation
 - TimingCalibration utilities
 - HeartbeatContext for thread-local state
+
+**Phase 3: Frame Management**
+
+- PromotionTracker with doubly-linked list
+- O(1) push/pop/promote operations
+- Frame lifecycle management
+- Integration with HeartbeatContext
+- Statistics tracking
 
 ## Configuration
 
@@ -112,7 +122,7 @@ HeartbeatConfig config = HeartbeatConfig.newBuilder()
         .build();
 ```
 
-## Usage (Phase 1 & 2 as of now)
+## Usage
 
 ```java
 // Create a task
@@ -168,11 +178,11 @@ View coverage report: `target/site/jacoco/index.html`
 
 ## Next Steps
 
-### Phase 3: Frame Management
+### Phase 4: Basic Executor
 
-- PromotionTracker with doubly-linked list
-- Frame lifecycle management
-- Thread-safe promotable frame tracking
+- Single-threaded executor
+- Frame promotion logic
+- Simple fork/join support
 
 ## References
 
