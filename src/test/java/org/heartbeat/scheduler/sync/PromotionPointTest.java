@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.sync;
 
+import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.heartbeat.scheduler.vthread.ContinuationScope;
 import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,39 +13,53 @@ class PromotionPointTest {
 
     private ContinuationScope scope;
     private HeartbeatContinuation continuation;
+    private HeartbeatTask<Integer> dummyTask;
 
     @BeforeEach
     void setUp() {
         scope = new ContinuationScope("test");
         continuation = new HeartbeatContinuation(scope, () -> {
         });
+        dummyTask = new HeartbeatTask<>() {
+            @Override
+            protected Integer compute() {
+                return 0;
+            }
+        };
     }
 
     @Test
     void testCreation() {
-        PromotionPoint point = new PromotionPoint(continuation, scope);
+        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
 
         assertThat(point.getContinuation()).isSameAs(continuation);
         assertThat(point.getScope()).isSameAs(scope);
+        assertThat(point.getTask()).isSameAs(dummyTask);
         assertThat(point.isPromoted()).isFalse();
         assertThat(point.getCreationTime()).isGreaterThan(0);
     }
 
     @Test
     void testNullContinuation() {
-        assertThatThrownBy(() -> new PromotionPoint(null, scope))
+        assertThatThrownBy(() -> new PromotionPoint(null, scope, dummyTask))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void testNullScope() {
-        assertThatThrownBy(() -> new PromotionPoint(continuation, null))
+        assertThatThrownBy(() -> new PromotionPoint(continuation, null, dummyTask))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void testNullTask() {
+        assertThatThrownBy(() -> new PromotionPoint(continuation, scope, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void testMarkPromoted() {
-        PromotionPoint point = new PromotionPoint(continuation, scope);
+        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
 
         assertThat(point.isPromoted()).isFalse();
 
@@ -59,7 +74,7 @@ class PromotionPointTest {
 
     @Test
     void testAge() throws InterruptedException {
-        PromotionPoint point = new PromotionPoint(continuation, scope);
+        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
 
         long age1 = point.getAgeNanos();
         assertThat(age1).isGreaterThanOrEqualTo(0);
@@ -73,7 +88,7 @@ class PromotionPointTest {
 
     @Test
     void testInitialListState() {
-        PromotionPoint point = new PromotionPoint(continuation, scope);
+        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
 
         assertThat(point.isHead()).isTrue();
         assertThat(point.isTail()).isTrue();
@@ -83,14 +98,14 @@ class PromotionPointTest {
 
     @Test
     void testDoublyLinkedList() {
-        PromotionPoint p1 = new PromotionPoint(continuation, scope);
+        PromotionPoint p1 = new PromotionPoint(continuation, scope, dummyTask);
         PromotionPoint p2 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
         PromotionPoint p3 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
 
         // Build list: p1 <-> p2 <-> p3
@@ -118,10 +133,10 @@ class PromotionPointTest {
 
     @Test
     void testInsertAfter() {
-        PromotionPoint p1 = new PromotionPoint(continuation, scope);
+        PromotionPoint p1 = new PromotionPoint(continuation, scope, dummyTask);
         PromotionPoint p2 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
 
         p2.insertAfter(p1);
@@ -132,10 +147,10 @@ class PromotionPointTest {
 
     @Test
     void testInsertBefore() {
-        PromotionPoint p1 = new PromotionPoint(continuation, scope);
+        PromotionPoint p1 = new PromotionPoint(continuation, scope, dummyTask);
         PromotionPoint p2 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
 
         p2.insertBefore(p1);
@@ -146,14 +161,14 @@ class PromotionPointTest {
 
     @Test
     void testRemoveFromList() {
-        PromotionPoint p1 = new PromotionPoint(continuation, scope);
+        PromotionPoint p1 = new PromotionPoint(continuation, scope, dummyTask);
         PromotionPoint p2 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
         PromotionPoint p3 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
 
         // Build list: p1 <-> p2 <-> p3
@@ -172,10 +187,10 @@ class PromotionPointTest {
 
     @Test
     void testRemoveHead() {
-        PromotionPoint p1 = new PromotionPoint(continuation, scope);
+        PromotionPoint p1 = new PromotionPoint(continuation, scope, dummyTask);
         PromotionPoint p2 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
 
         p2.insertAfter(p1);
@@ -188,10 +203,10 @@ class PromotionPointTest {
 
     @Test
     void testRemoveTail() {
-        PromotionPoint p1 = new PromotionPoint(continuation, scope);
+        PromotionPoint p1 = new PromotionPoint(continuation, scope, dummyTask);
         PromotionPoint p2 = new PromotionPoint(
                 new HeartbeatContinuation(scope, () -> {
-                }), scope
+                }), scope, dummyTask
         );
 
         p2.insertAfter(p1);
@@ -209,7 +224,7 @@ class PromotionPointTest {
         for (int i = 0; i < 5; i++) {
             HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {
             });
-            points[i] = new PromotionPoint(cont, scope);
+            points[i] = new PromotionPoint(cont, scope, dummyTask);
             if (i > 0) {
                 points[i].insertAfter(points[i - 1]);
             }
@@ -242,7 +257,7 @@ class PromotionPointTest {
 
     @Test
     void testToString() {
-        PromotionPoint point = new PromotionPoint(continuation, scope);
+        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
         String str = point.toString();
 
         assertThat(str).contains("scope=test");

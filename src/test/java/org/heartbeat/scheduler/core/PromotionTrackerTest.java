@@ -1,6 +1,7 @@
 package org.heartbeat.scheduler.core;
 
 import org.heartbeat.scheduler.sync.PromotionPoint;
+import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.heartbeat.scheduler.vthread.ContinuationScope;
 import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,10 +20,19 @@ class PromotionTrackerTest {
         scope = new ContinuationScope("test");
     }
 
+    private HeartbeatTask<Integer> createDummyTask() {
+        return new HeartbeatTask<>() {
+            @Override
+            protected Integer compute() {
+                return 0;
+            }
+        };
+    }
+
     private PromotionPoint createFrame() {
         HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {
         });
-        return new PromotionPoint(cont, scope);
+        return new PromotionPoint(cont, scope, createDummyTask());
     }
 
     @Test

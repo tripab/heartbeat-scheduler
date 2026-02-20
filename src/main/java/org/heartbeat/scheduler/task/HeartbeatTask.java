@@ -116,7 +116,7 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
                 // Exception stored in task
             }
         });
-        PromotionPoint point = new PromotionPoint(continuation, task.getScope());
+        PromotionPoint point = new PromotionPoint(continuation, task.getScope(), task);
         tracker.pushFrame(point);
 
         // Check heartbeat - promote oldest frame if timer has fired

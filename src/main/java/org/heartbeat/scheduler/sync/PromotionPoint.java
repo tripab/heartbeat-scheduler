@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.sync;
 
+import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.heartbeat.scheduler.vthread.ContinuationScope;
 import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
 
@@ -13,6 +14,7 @@ import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
  */
 public class PromotionPoint {
     private final HeartbeatContinuation continuation;
+    private final HeartbeatTask<?> task;
     private final long creationTime;
     private final ContinuationScope scope;
     private volatile boolean promoted;
@@ -27,10 +29,12 @@ public class PromotionPoint {
      *
      * @param continuation The continuation that can be promoted
      * @param scope        The scope of this promotion point
+     * @param task         The task associated with this promotion point
      */
     public PromotionPoint(
             HeartbeatContinuation continuation,
-            ContinuationScope scope
+            ContinuationScope scope,
+            HeartbeatTask<?> task
     ) {
         if (continuation == null) {
             throw new IllegalArgumentException("Continuation cannot be null");
@@ -38,9 +42,13 @@ public class PromotionPoint {
         if (scope == null) {
             throw new IllegalArgumentException("Scope cannot be null");
         }
+        if (task == null) {
+            throw new IllegalArgumentException("Task cannot be null");
+        }
 
         this.continuation = continuation;
         this.scope = scope;
+        this.task = task;
         this.creationTime = System.nanoTime();
         this.promoted = false;
     }
@@ -50,6 +58,13 @@ public class PromotionPoint {
      */
     public HeartbeatContinuation getContinuation() {
         return continuation;
+    }
+
+    /**
+     * Get the task associated with this promotion point.
+     */
+    public HeartbeatTask<?> getTask() {
+        return task;
     }
 
     /**
