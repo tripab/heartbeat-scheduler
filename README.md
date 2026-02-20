@@ -85,6 +85,15 @@ src/main/java/org/heartbeat/scheduler
 - Integration with HeartbeatContext
 - Statistics tracking
 
+**Phase 4: Basic Executor**
+
+- VirtualThreadExecutor for task execution
+- Fork/join implementation in HeartbeatTask
+- Actual promotion logic (frame → virtual thread)
+- Fibonacci benchmark example
+- Parallel sum benchmark example
+- Comprehensive integration tests
+
 ## Configuration
 
 ### Creating a Configuration
@@ -124,18 +133,118 @@ HeartbeatConfig config = HeartbeatConfig.newBuilder()
 
 ## Usage
 
-```java
-// Create a task
-HeartbeatTask<Integer> task = new HeartbeatTask<>() {
-            @Override
-            protected Integer compute() {
-                // Your computation here
-                return 42;
-            }
-        };
+### Basic Example
 
-// Execute task
-Integer result = task.call();
+```java
+// Configure the scheduler
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+                .targetOverheadPercent(5.0)  // 5% overhead
+                .build();
+
+// Create executor
+VirtualThreadExecutor executor = new VirtualThreadExecutor(config);
+
+// Define a task
+HeartbeatTask<Integer> task = new HeartbeatTask<>() {
+    @Override
+    protected Integer compute() {
+        return 42;
+    }
+};
+
+// Execute and get result
+Integer result = executor.submit(task);
+System.out.
+
+println("Result: "+result);
+
+executor.
+
+shutdown();
+```
+
+### Fork-Join Example
+
+```java
+// Recursive Fibonacci with fork-join
+class FibTask extends HeartbeatTask<Long> {
+    private final int n;
+
+    FibTask(int n) {
+        this.n = n;
+    }
+
+    @Override
+    protected Long compute() {
+        if (n <= 1) return (long) n;
+
+        FibTask f1 = new FibTask(n - 1);
+        FibTask f2 = new FibTask(n - 2);
+
+        fork(f1);  // May be promoted to parallel
+        fork(f2);
+
+        return join(f1) + join(f2);
+    }
+}
+
+// Execute
+VirtualThreadExecutor executor = new VirtualThreadExecutor(config);
+Long result = executor.submit(new FibTask(20));
+System.out.
+
+println("Fib(20) = "+result);
+```
+
+### Parallel Array Sum
+
+```java
+class SumTask extends HeartbeatTask<Long> {
+    private final int[] array;
+    private final int start, end, threshold;
+
+    SumTask(int[] array, int start, int end, int threshold) {
+        this.array = array;
+        this.start = start;
+        this.end = end;
+        this.threshold = threshold;
+    }
+
+    @Override
+    protected Long compute() {
+        if (end - start <= threshold) {
+            // Base case: sequential sum
+            long sum = 0;
+            for (int i = start; i < end; i++) {
+                sum += array[i];
+            }
+            return sum;
+        }
+
+        // Divide and conquer
+        int mid = (start + end) / 2;
+        SumTask left = new SumTask(array, start, mid, threshold);
+        SumTask right = new SumTask(array, mid, end, threshold);
+
+        fork(left);
+        fork(right);
+
+        return join(left) + join(right);
+    }
+}
+```
+
+## Running Examples
+
+```bash
+# Compile
+mvn clean compile
+
+# Run Fibonacci benchmark
+java -cp target/classes org.heartbeat.examples.FibonacciExample 20
+
+# Run parallel sum benchmark
+java -cp target/classes org.heartbeat.examples.ParallelSumExample 1000000 10000
 ```
 
 ## Implementation Details
