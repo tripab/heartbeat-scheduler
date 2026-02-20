@@ -6,7 +6,7 @@ import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
 /**
  * Represents a point where a continuation can be promoted.
  * Corresponds to PAIRL frames in the paper's semantics.
- * 
+ * <p>
  * These form a doubly-linked list to maintain O(1) access to
  * the oldest promotable frame, as required by the paper's
  * promotion strategy.
@@ -24,13 +24,13 @@ public class PromotionPoint {
 
     /**
      * Create a new promotion point.
-     * 
+     *
      * @param continuation The continuation that can be promoted
-     * @param scope The scope of this promotion point
+     * @param scope        The scope of this promotion point
      */
     public PromotionPoint(
-        HeartbeatContinuation continuation,
-        ContinuationScope scope
+            HeartbeatContinuation continuation,
+            ContinuationScope scope
     ) {
         if (continuation == null) {
             throw new IllegalArgumentException("Continuation cannot be null");
@@ -38,7 +38,7 @@ public class PromotionPoint {
         if (scope == null) {
             throw new IllegalArgumentException("Scope cannot be null");
         }
-        
+
         this.continuation = continuation;
         this.scope = scope;
         this.creationTime = System.nanoTime();
@@ -132,14 +132,14 @@ public class PromotionPoint {
      * Check if this is the head (newest) of the list.
      */
     public boolean isHead() {
-        return prev == null;
+        return next == null;
     }
 
     /**
      * Check if this is the tail (oldest) of the list.
      */
     public boolean isTail() {
-        return next == null;
+        return prev == null;
     }
 
     /**
@@ -164,10 +164,10 @@ public class PromotionPoint {
         if (node == null) {
             throw new IllegalArgumentException("Node cannot be null");
         }
-        
+
         this.prev = node;
         this.next = node.next;
-        
+
         if (node.next != null) {
             node.next.prev = this;
         }
@@ -181,10 +181,10 @@ public class PromotionPoint {
         if (node == null) {
             throw new IllegalArgumentException("Node cannot be null");
         }
-        
+
         this.next = node;
         this.prev = node.prev;
-        
+
         if (node.prev != null) {
             node.prev.next = this;
         }
@@ -194,12 +194,12 @@ public class PromotionPoint {
     @Override
     public String toString() {
         return String.format(
-            "PromotionPoint[scope=%s, age=%.2fμs, promoted=%s, isHead=%s, isTail=%s]",
-            scope.name(),
-            getAgeMicros() / 1000.0,
-            promoted,
-            isHead(),
-            isTail()
+                "PromotionPoint[scope=%s, age=%.2fμs, promoted=%s, isHead=%s, isTail=%s]",
+                scope.name(),
+                getAgeMicros() / 1000.0,
+                promoted,
+                isHead(),
+                isTail()
         );
     }
 

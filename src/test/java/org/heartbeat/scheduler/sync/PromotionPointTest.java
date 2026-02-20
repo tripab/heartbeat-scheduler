@@ -2,10 +2,11 @@ package org.heartbeat.scheduler.sync;
 
 import org.heartbeat.scheduler.vthread.ContinuationScope;
 import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PromotionPointTest {
 
@@ -15,7 +16,8 @@ class PromotionPointTest {
     @BeforeEach
     void setUp() {
         scope = new ContinuationScope("test");
-        continuation = new HeartbeatContinuation(scope, () -> {});
+        continuation = new HeartbeatContinuation(scope, () -> {
+        });
     }
 
     @Test
@@ -31,13 +33,13 @@ class PromotionPointTest {
     @Test
     void testNullContinuation() {
         assertThatThrownBy(() -> new PromotionPoint(null, scope))
-            .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void testNullScope() {
         assertThatThrownBy(() -> new PromotionPoint(continuation, null))
-            .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -45,14 +47,14 @@ class PromotionPointTest {
         PromotionPoint point = new PromotionPoint(continuation, scope);
 
         assertThat(point.isPromoted()).isFalse();
-        
+
         point.markPromoted();
         assertThat(point.isPromoted()).isTrue();
 
         // Cannot promote twice
         assertThatThrownBy(point::markPromoted)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Already promoted");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Already promoted");
     }
 
     @Test
@@ -83,10 +85,12 @@ class PromotionPointTest {
     void testDoublyLinkedList() {
         PromotionPoint p1 = new PromotionPoint(continuation, scope);
         PromotionPoint p2 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
         PromotionPoint p3 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
 
         // Build list: p1 <-> p2 <-> p3
@@ -104,19 +108,20 @@ class PromotionPointTest {
         assertThat(p3.getPrev()).isSameAs(p2);
 
         // Check head/tail
-        assertThat(p1.isHead()).isTrue();
-        assertThat(p1.isTail()).isFalse();
+        assertThat(p1.isHead()).isFalse();
+        assertThat(p1.isTail()).isTrue();
         assertThat(p2.isHead()).isFalse();
         assertThat(p2.isTail()).isFalse();
-        assertThat(p3.isHead()).isFalse();
-        assertThat(p3.isTail()).isTrue();
+        assertThat(p3.isHead()).isTrue();
+        assertThat(p3.isTail()).isFalse();
     }
 
     @Test
     void testInsertAfter() {
         PromotionPoint p1 = new PromotionPoint(continuation, scope);
         PromotionPoint p2 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
 
         p2.insertAfter(p1);
@@ -129,7 +134,8 @@ class PromotionPointTest {
     void testInsertBefore() {
         PromotionPoint p1 = new PromotionPoint(continuation, scope);
         PromotionPoint p2 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
 
         p2.insertBefore(p1);
@@ -142,10 +148,12 @@ class PromotionPointTest {
     void testRemoveFromList() {
         PromotionPoint p1 = new PromotionPoint(continuation, scope);
         PromotionPoint p2 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
         PromotionPoint p3 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
 
         // Build list: p1 <-> p2 <-> p3
@@ -166,7 +174,8 @@ class PromotionPointTest {
     void testRemoveHead() {
         PromotionPoint p1 = new PromotionPoint(continuation, scope);
         PromotionPoint p2 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
 
         p2.insertAfter(p1);
@@ -181,7 +190,8 @@ class PromotionPointTest {
     void testRemoveTail() {
         PromotionPoint p1 = new PromotionPoint(continuation, scope);
         PromotionPoint p2 = new PromotionPoint(
-            new HeartbeatContinuation(scope, () -> {}), scope
+                new HeartbeatContinuation(scope, () -> {
+                }), scope
         );
 
         p2.insertAfter(p1);
@@ -197,27 +207,28 @@ class PromotionPointTest {
         // Build a list with 5 nodes
         PromotionPoint[] points = new PromotionPoint[5];
         for (int i = 0; i < 5; i++) {
-            HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {});
+            HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {
+            });
             points[i] = new PromotionPoint(cont, scope);
             if (i > 0) {
-                points[i].insertAfter(points[i-1]);
+                points[i].insertAfter(points[i - 1]);
             }
         }
 
         // Verify structure
         for (int i = 0; i < 5; i++) {
             if (i == 0) {
-                assertThat(points[i].isHead()).isTrue();
+                assertThat(points[i].isTail()).isTrue();
                 assertThat(points[i].getPrev()).isNull();
             } else {
-                assertThat(points[i].getPrev()).isSameAs(points[i-1]);
+                assertThat(points[i].getPrev()).isSameAs(points[i - 1]);
             }
 
             if (i == 4) {
-                assertThat(points[i].isTail()).isTrue();
+                assertThat(points[i].isHead()).isTrue();
                 assertThat(points[i].getNext()).isNull();
             } else {
-                assertThat(points[i].getNext()).isSameAs(points[i+1]);
+                assertThat(points[i].getNext()).isSameAs(points[i + 1]);
             }
         }
 
