@@ -15,6 +15,7 @@ public class HeartbeatContext {
     private final HeartbeatTimer timer;
     private final PollingStrategy pollingStrategy;
     private final HeartbeatConfig config;
+    private final PromotionTracker promotionTracker;
 
     // Statistics (optional)
     private long totalPromotions;
@@ -41,6 +42,7 @@ public class HeartbeatContext {
         this.config = config;
         this.timer = new HeartbeatTimer(config.getHeartbeatPeriodNanos());
         this.pollingStrategy = pollingStrategy;
+        this.promotionTracker = new PromotionTracker();
         this.totalPromotions = 0;
         this.totalPolls = 0;
         this.totalOperations = 0;
@@ -90,6 +92,13 @@ public class HeartbeatContext {
      */
     public HeartbeatConfig getConfig() {
         return config;
+    }
+
+    /**
+     * Get the promotion tracker for this context.
+     */
+    public PromotionTracker getPromotionTracker() {
+        return promotionTracker;
     }
 
     /**
