@@ -10,6 +10,7 @@ import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Base class for computations that can be executed with
@@ -29,7 +30,7 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
 
     // Phase 4: executor and promotion state
     private volatile VirtualThreadExecutor executor;
-    volatile CompletableFuture<T> promotedFuture;
+    private final AtomicReference<CompletableFuture<T>> promotedFuture = new AtomicReference<>();
 
     protected HeartbeatTask() {
         this(ContinuationScope.createDefault());
@@ -125,8 +126,13 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
             if (oldest != null && executor != null) {
                 @SuppressWarnings("unchecked")
                 HeartbeatTask<Object> oldestTask = (HeartbeatTask<Object>) oldest.getTask();
-                oldestTask.promotedFuture = executor.promoteTask(oldestTask);
-                context.recordPromotion();
+                CompletableFuture<Object> future = executor.promoteTask(oldestTask);
+                if (oldestTask.promotedFuture.compareAndSet(null, future)) {
+                    context.recordPromotion();
+                } else {
+                    // Another thread already promoted this task; cancel our submission
+                    future.cancel(false);
+                }
             }
         }
 
@@ -144,10 +150,11 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
      * @return The result of the task
      */
     protected <U> U join(HeartbeatTask<U> task) {
-        // If the task was promoted, wait for its future
-        if (task.promotedFuture != null) {
+        // Atomically read the promoted future to prevent race with fork()
+        CompletableFuture<U> future = task.promotedFuture.get();
+        if (future != null) {
             try {
-                return task.promotedFuture.get();
+                return future.get();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Join interrupted", e);
@@ -196,6 +203,10 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
 
     public VirtualThreadExecutor getExecutor() {
         return executor;
+    }
+
+    public boolean isPromoted() {
+        return promotedFuture.get() != null;
     }
 
     public T getResult() {
