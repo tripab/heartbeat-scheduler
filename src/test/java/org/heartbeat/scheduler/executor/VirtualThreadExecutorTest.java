@@ -105,4 +105,29 @@ class VirtualThreadExecutorTest {
         assertThatThrownBy(() -> new VirtualThreadExecutor(null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void testAutoCloseable() throws Exception {
+        HeartbeatConfig config = HeartbeatConfig.newBuilder()
+                .heartbeatPeriodNanos(30_000)
+                .promotionCostNanos(1_500)
+                .build();
+
+        VirtualThreadExecutor autoCloseExecutor;
+        try (VirtualThreadExecutor exec = new VirtualThreadExecutor(config)) {
+            autoCloseExecutor = exec;
+            Integer result = exec.submit(new HeartbeatTask<>() {
+                @Override protected Integer compute() { return 99; }
+            });
+            assertThat(result).isEqualTo(99);
+        }
+        assertThat(autoCloseExecutor.isShutdown()).isTrue();
+    }
+
+    @Test
+    void testDoubleShutdownIsSafe() {
+        executor.shutdown();
+        executor.shutdown(); // should not throw
+        assertThat(executor.isShutdown()).isTrue();
+    }
 }

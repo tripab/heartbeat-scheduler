@@ -7,6 +7,7 @@ import org.heartbeat.scheduler.core.PollingStrategy;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,10 +22,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * HeartbeatContext is propagated to promoted threads so that nested
  * fork/join operations continue to work correctly.
  */
-public class VirtualThreadExecutor {
+public class VirtualThreadExecutor implements AutoCloseable {
     private final HeartbeatConfig config;
     private final ExecutorService virtualThreadPool;
-    private volatile boolean shutdown;
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     // Statistics
     private final AtomicLong totalTasksExecuted = new AtomicLong();
@@ -37,7 +38,6 @@ public class VirtualThreadExecutor {
         }
         this.config = config;
         this.virtualThreadPool = Executors.newVirtualThreadPerTaskExecutor();
-        this.shutdown = false;
         this.activeVirtualThreads = new AtomicInteger(0);
     }
 
@@ -49,7 +49,7 @@ public class VirtualThreadExecutor {
      * @throws ExecutionException if the task throws an exception
      */
     public <T> T submit(HeartbeatTask<T> task) throws ExecutionException {
-        if (shutdown) {
+        if (shutdown.get()) {
             throw new IllegalStateException("Executor has been shut down");
         }
 
@@ -75,26 +75,31 @@ public class VirtualThreadExecutor {
      * Submit a task for async execution. Returns a CompletableFuture.
      */
     public <T> CompletableFuture<T> submitAsync(HeartbeatTask<T> task) {
-        if (shutdown) {
+        if (shutdown.get()) {
             throw new IllegalStateException("Executor has been shut down");
         }
 
         CompletableFuture<T> future = new CompletableFuture<>();
 
-        virtualThreadPool.submit(() -> {
-            HeartbeatContext context = createContext();
-            HeartbeatContext.setCurrent(context);
-            try {
-                task.setExecutor(this);
-                T result = task.call();
-                totalTasksExecuted.incrementAndGet();
-                future.complete(result);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            } finally {
-                HeartbeatContext.clearCurrent();
-            }
-        });
+        try {
+            virtualThreadPool.submit(() -> {
+                HeartbeatContext context = createContext();
+                HeartbeatContext.setCurrent(context);
+                try {
+                    task.setExecutor(this);
+                    T result = task.call();
+                    totalTasksExecuted.incrementAndGet();
+                    future.complete(result);
+                } catch (Exception e) {
+                    future.completeExceptionally(e);
+                } finally {
+                    HeartbeatContext.clearCurrent();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            future.completeExceptionally(
+                    new IllegalStateException("Executor shut down during submission", e));
+        }
 
         return future;
     }
@@ -111,31 +116,38 @@ public class VirtualThreadExecutor {
 
         CompletableFuture<T> future = new CompletableFuture<>();
 
-        virtualThreadPool.submit(() -> {
-            // Create a fresh context for this promoted thread.
-            // This is the fix for the threadlocal propagation bug:
-            // each promoted virtual thread gets its own HeartbeatContext
-            // initialized from the shared config.
-            HeartbeatContext promotedContext = createContext();
-            HeartbeatContext.setCurrent(promotedContext);
-            try {
-                task.setExecutor(this);
-                T result = task.call();
-                totalTasksExecuted.incrementAndGet();
-                future.complete(result);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            } finally {
-                HeartbeatContext.clearCurrent();
-            }
-        });
+        try {
+            virtualThreadPool.submit(() -> {
+                HeartbeatContext promotedContext = createContext();
+                HeartbeatContext.setCurrent(promotedContext);
+                try {
+                    task.setExecutor(this);
+                    T result = task.call();
+                    totalTasksExecuted.incrementAndGet();
+                    future.complete(result);
+                } catch (Exception e) {
+                    future.completeExceptionally(e);
+                } finally {
+                    HeartbeatContext.clearCurrent();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            future.completeExceptionally(
+                    new IllegalStateException("Executor shut down during promotion", e));
+        }
 
         return future;
     }
 
     public void shutdown() {
-        shutdown = true;
-        virtualThreadPool.shutdown();
+        if (shutdown.compareAndSet(false, true)) {
+            virtualThreadPool.shutdown();
+        }
+    }
+
+    @Override
+    public void close() {
+        shutdown();
     }
 
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
@@ -155,7 +167,7 @@ public class VirtualThreadExecutor {
     }
 
     public boolean isShutdown() {
-        return shutdown;
+        return shutdown.get();
     }
 
     public HeartbeatConfig getConfig() {
@@ -170,7 +182,7 @@ public class VirtualThreadExecutor {
                 totalTasksExecuted.get(),
                 totalPromotions.get(),
                 activeVirtualThreads.get(),
-                shutdown
+                shutdown.get()
         );
     }
 
