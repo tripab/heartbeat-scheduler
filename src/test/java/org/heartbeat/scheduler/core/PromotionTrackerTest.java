@@ -278,6 +278,52 @@ class PromotionTrackerTest {
     }
 
     @Test
+    void testRemoveTailDoesNotMarkPromoted() {
+        PromotionPoint f1 = createFrame();
+        PromotionPoint f2 = createFrame();
+
+        tracker.pushFrame(f1);
+        tracker.pushFrame(f2);
+
+        // Remove tail (oldest) via removeFrame - should NOT mark as promoted
+        boolean removed = tracker.removeFrame(f1);
+
+        assertThat(removed).isTrue();
+        assertThat(f1.isPromoted()).isFalse();
+        assertThat(tracker.getTotalFramesPromoted()).isEqualTo(0);
+        assertThat(tracker.size()).isEqualTo(1);
+    }
+
+    @Test
+    void testRemoveMiddleDoesNotMarkPromoted() {
+        PromotionPoint f1 = createFrame();
+        PromotionPoint f2 = createFrame();
+        PromotionPoint f3 = createFrame();
+
+        tracker.pushFrame(f1);
+        tracker.pushFrame(f2);
+        tracker.pushFrame(f3);
+
+        boolean removed = tracker.removeFrame(f2);
+
+        assertThat(removed).isTrue();
+        assertThat(f2.isPromoted()).isFalse();
+        assertThat(tracker.getTotalFramesPromoted()).isEqualTo(0);
+    }
+
+    @Test
+    void testPromoteOldestDoesMarkPromoted() {
+        PromotionPoint f1 = createFrame();
+        tracker.pushFrame(f1);
+
+        PromotionPoint promoted = tracker.promoteOldest();
+
+        assertThat(promoted).isSameAs(f1);
+        assertThat(f1.isPromoted()).isTrue();
+        assertThat(tracker.getTotalFramesPromoted()).isEqualTo(1);
+    }
+
+    @Test
     void testClear() {
         tracker.pushFrame(createFrame());
         tracker.pushFrame(createFrame());

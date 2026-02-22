@@ -141,38 +141,19 @@ public class PromotionTracker {
      * @return The promoted frame, or null if no frames exist
      */
     public PromotionPoint promoteOldest() {
-        if (tail == null) {
-            return null;
+        PromotionPoint removed = removeTail();
+        if (removed != null) {
+            removed.markPromoted();
+            totalFramesPromoted++;
         }
-
-        PromotionPoint promoted = tail;
-        tail = tail.getNext();  // Move tail forward
-
-        if (tail == null) {
-            // List is now empty
-            head = null;
-        } else {
-            tail.setPrev(null);  // New tail has no prev
-        }
-
-        // Detach the promoted frame
-        promoted.setPrev(null);
-        promoted.setNext(null);
-
-        // Mark as promoted
-        promoted.markPromoted();
-
-        size--;
-        totalFramesPromoted++;
-
-        return promoted;
+        return removed;
     }
 
     /**
      * Remove a specific frame from anywhere in the list.
      * <p>
      * This is used when a frame completes or is otherwise invalidated
-     * before promotion.
+     * before promotion. The frame is NOT marked as promoted.
      *
      * @param frame The frame to remove
      * @return true if the frame was found and removed
@@ -190,7 +171,7 @@ public class PromotionTracker {
 
         // Check if it's the tail
         if (frame == tail) {
-            promoteOldest();  // This removes tail
+            removeTail();
             return true;
         }
 
@@ -199,6 +180,33 @@ public class PromotionTracker {
         size--;
 
         return true;
+    }
+
+    /**
+     * Remove the tail (oldest) frame from the list without marking it as promoted.
+     * Used internally by both promoteOldest() and removeFrame().
+     *
+     * @return The removed tail frame, or null if the list is empty
+     */
+    private PromotionPoint removeTail() {
+        if (tail == null) {
+            return null;
+        }
+
+        PromotionPoint removed = tail;
+        tail = tail.getNext();
+
+        if (tail == null) {
+            head = null;
+        } else {
+            tail.setPrev(null);
+        }
+
+        removed.setPrev(null);
+        removed.setNext(null);
+
+        size--;
+        return removed;
     }
 
     /**
