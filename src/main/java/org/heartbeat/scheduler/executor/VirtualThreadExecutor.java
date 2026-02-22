@@ -1,9 +1,7 @@
 package org.heartbeat.scheduler.executor;
 
-import org.heartbeat.scheduler.core.CountBasedPolling;
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.core.HeartbeatContext;
-import org.heartbeat.scheduler.core.PollingStrategy;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
 import java.util.concurrent.*;
@@ -187,8 +185,7 @@ public class VirtualThreadExecutor implements AutoCloseable {
     }
 
     private HeartbeatContext createContext() {
-        PollingStrategy polling = CountBasedPolling.every(1);
-        return new HeartbeatContext(config, polling);
+        return new HeartbeatContext(config, config.createPollingStrategy());
     }
 
     /**

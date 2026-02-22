@@ -1,5 +1,7 @@
 package org.heartbeat.scheduler.core;
 
+import java.util.function.Supplier;
+
 /**
  * Configuration for Heartbeat Scheduler.
  * 
@@ -16,6 +18,7 @@ public class HeartbeatConfig {
     private final int numCarrierThreads;
     private final boolean enableStatistics;
     private final boolean enableDebugLogging;
+    private final Supplier<PollingStrategy> pollingStrategyFactory;
 
     private HeartbeatConfig(Builder builder) {
         this.heartbeatPeriodNanos = builder.heartbeatPeriodNanos;
@@ -23,6 +26,7 @@ public class HeartbeatConfig {
         this.numCarrierThreads = builder.numCarrierThreads;
         this.enableStatistics = builder.enableStatistics;
         this.enableDebugLogging = builder.enableDebugLogging;
+        this.pollingStrategyFactory = builder.pollingStrategyFactory;
     }
 
     public long getHeartbeatPeriodNanos() {
@@ -43,6 +47,13 @@ public class HeartbeatConfig {
 
     public boolean isDebugLoggingEnabled() {
         return enableDebugLogging;
+    }
+
+    /**
+     * Create a new PollingStrategy instance using the configured factory.
+     */
+    public PollingStrategy createPollingStrategy() {
+        return pollingStrategyFactory.get();
     }
 
     /**
@@ -99,6 +110,10 @@ public class HeartbeatConfig {
         
         private boolean enableStatistics = false;
         private boolean enableDebugLogging = false;
+
+        // Default: count-based polling every 100 operations
+        private Supplier<PollingStrategy> pollingStrategyFactory =
+                () -> CountBasedPolling.every(100);
 
         /**
          * Set heartbeat period in nanoseconds.
@@ -178,6 +193,18 @@ public class HeartbeatConfig {
          */
         public Builder enableDebugLogging(boolean enable) {
             this.enableDebugLogging = enable;
+            return this;
+        }
+
+        /**
+         * Set the factory for creating PollingStrategy instances.
+         * Each HeartbeatContext gets its own instance from this factory.
+         */
+        public Builder pollingStrategyFactory(Supplier<PollingStrategy> factory) {
+            if (factory == null) {
+                throw new IllegalArgumentException("Polling strategy factory cannot be null");
+            }
+            this.pollingStrategyFactory = factory;
             return this;
         }
 
