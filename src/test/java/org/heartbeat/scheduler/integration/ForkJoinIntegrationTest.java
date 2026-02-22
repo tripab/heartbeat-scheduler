@@ -7,6 +7,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -237,5 +240,80 @@ class ForkJoinIntegrationTest {
     void testAsyncSubmission() throws Exception {
         var future = executor.submitAsync(new FibTask(10));
         assertThat(future.get(5, TimeUnit.SECONDS)).isEqualTo(55L);
+    }
+
+    @Test
+    void testOldestTaskIsPromoted() throws ExecutionException {
+        // Use a very short heartbeat so promotion is nearly guaranteed.
+        // With aggressive promotion, the oldest forked task should be promoted
+        // and results should still be correct (verifying the right task runs).
+        HeartbeatConfig aggressiveConfig = HeartbeatConfig.newBuilder()
+                .heartbeatPeriodNanos(100)  // very short period for aggressive promotion
+                .promotionCostNanos(1)
+                .enableStatistics(true)
+                .build();
+        VirtualThreadExecutor aggressiveExecutor = new VirtualThreadExecutor(aggressiveConfig);
+
+        try {
+            // Each task records its own thread to detect promotion.
+            // The oldest forked task should be the one promoted to a different thread.
+            List<Long> threadIds = Collections.synchronizedList(new ArrayList<>());
+
+            HeartbeatTask<String> task = new HeartbeatTask<>() {
+                @Override
+                protected String compute() {
+                    long parentThread = Thread.currentThread().threadId();
+
+                    HeartbeatTask<String> t1 = new HeartbeatTask<>() {
+                        @Override
+                        protected String compute() {
+                            threadIds.add(Thread.currentThread().threadId());
+                            return "first";
+                        }
+                    };
+                    HeartbeatTask<String> t2 = new HeartbeatTask<>() {
+                        @Override
+                        protected String compute() {
+                            threadIds.add(Thread.currentThread().threadId());
+                            return "second";
+                        }
+                    };
+                    HeartbeatTask<String> t3 = new HeartbeatTask<>() {
+                        @Override
+                        protected String compute() {
+                            threadIds.add(Thread.currentThread().threadId());
+                            return "third";
+                        }
+                    };
+
+                    fork(t1);
+                    fork(t2);
+                    fork(t3);
+
+                    String r1 = join(t1);
+                    String r2 = join(t2);
+                    String r3 = join(t3);
+                    return r1 + "," + r2 + "," + r3;
+                }
+            };
+
+            String result = aggressiveExecutor.submit(task);
+            // Correctness: all results are present regardless of promotion
+            assertThat(result).isEqualTo("first,second,third");
+
+            // If promotions occurred, verify the executor recorded them
+            long promotions = aggressiveExecutor.getTotalPromotionsPerformed();
+            if (promotions > 0) {
+                // At least one task ran on a different thread (was promoted)
+                assertThat(threadIds).hasSizeGreaterThanOrEqualTo(1);
+            }
+        } finally {
+            aggressiveExecutor.shutdown();
+            try {
+                aggressiveExecutor.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 }

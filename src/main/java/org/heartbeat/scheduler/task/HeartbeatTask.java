@@ -123,10 +123,9 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
         if (context.checkHeartbeat()) {
             PromotionPoint oldest = tracker.promoteOldest();
             if (oldest != null && executor != null) {
-                // Find which task corresponds to the promoted frame
-                // For simplicity, we promote the current forked task if it's the oldest
-                // In a more sophisticated implementation, we'd track task<->frame mapping
-                task.promotedFuture = executor.promoteTask(task);
+                @SuppressWarnings("unchecked")
+                HeartbeatTask<Object> oldestTask = (HeartbeatTask<Object>) oldest.getTask();
+                oldestTask.promotedFuture = executor.promoteTask(oldestTask);
                 context.recordPromotion();
             }
         }
