@@ -243,6 +243,25 @@ class ForkJoinIntegrationTest {
     }
 
     @Test
+    void testDeepRecursionTriggersPromotions() throws ExecutionException {
+        // Use aggressive heartbeat to guarantee promotions on a deep recursive task
+        HeartbeatConfig aggressiveConfig = HeartbeatConfig.newBuilder()
+                .heartbeatPeriodNanos(100)
+                .promotionCostNanos(1)
+                .enableStatistics(true)
+                .build();
+
+        try (VirtualThreadExecutor aggressiveExecutor = new VirtualThreadExecutor(aggressiveConfig)) {
+            // fib(20) creates thousands of fork points — promotions must happen
+            Long result = aggressiveExecutor.submit(new FibTask(20));
+            assertThat(result).isEqualTo(6765L);
+            assertThat(aggressiveExecutor.getTotalPromotionsPerformed())
+                    .as("Deep recursive task should trigger at least one promotion")
+                    .isGreaterThan(0);
+        }
+    }
+
+    @Test
     void testOldestTaskIsPromoted() throws ExecutionException {
         // Use a very short heartbeat so promotion is nearly guaranteed.
         // With aggressive promotion, the oldest forked task should be promoted
