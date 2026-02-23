@@ -9,7 +9,11 @@ import java.util.Objects;
  * In the paper's terminology, this represents the scope in which
  * parallel computations can yield and be promoted.
  */
-public record ContinuationScope(String name, ContinuationScope parent) {
+public final class ContinuationScope {
+    private final String name;
+    private final ContinuationScope parent;
+    private final jdk.internal.vm.ContinuationScope jdkScope;
+
     /**
      * Create a new continuation scope with the given name.
      */
@@ -21,16 +25,18 @@ public record ContinuationScope(String name, ContinuationScope parent) {
      * Create a new continuation scope with a parent scope.
      * Allows for nested scopes.
      */
-    public ContinuationScope {
+    public ContinuationScope(String name, ContinuationScope parent) {
         if (name == null || name.isEmpty()) {
             throw new IllegalArgumentException("Scope name cannot be null or empty");
         }
+        this.name = name;
+        this.parent = parent;
+        this.jdkScope = new jdk.internal.vm.ContinuationScope(name);
     }
 
     /**
      * Get the name of this scope.
      */
-    @Override
     public String name() {
         return name;
     }
@@ -38,7 +44,6 @@ public record ContinuationScope(String name, ContinuationScope parent) {
     /**
      * Get the parent scope, or null if this is a root scope.
      */
-    @Override
     public ContinuationScope parent() {
         return parent;
     }
@@ -74,12 +79,16 @@ public record ContinuationScope(String name, ContinuationScope parent) {
                 (Objects.equals(parent, other.parent));
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, parent);
+    }
+
     /**
-     * Convert to JDK internal scope for actual continuation usage.
-     * This requires access to jdk.internal.vm.
+     * Return the cached JDK internal scope for actual continuation usage.
      */
     jdk.internal.vm.ContinuationScope toJdkScope() {
-        return new jdk.internal.vm.ContinuationScope(name);
+        return jdkScope;
     }
 
     /**
