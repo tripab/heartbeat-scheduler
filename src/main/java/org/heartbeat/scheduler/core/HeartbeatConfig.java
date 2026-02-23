@@ -111,6 +111,10 @@ public class HeartbeatConfig {
         private boolean enableStatistics = false;
         private boolean enableDebugLogging = false;
 
+        // If set (> 0), targetOverheadPercent is resolved lazily in build()
+        // to compute heartbeatPeriodNanos from the final promotionCostNanos.
+        private double targetOverheadPercent = -1;
+
         // Default: count-based polling every 100 operations
         private Supplier<PollingStrategy> pollingStrategyFactory =
                 () -> CountBasedPolling.every(100);
@@ -164,8 +168,7 @@ public class HeartbeatConfig {
                     "Target overhead must be between 0 and 100 percent"
                 );
             }
-            this.heartbeatPeriodNanos = 
-                (long) ((100.0 / percent) * promotionCostNanos);
+            this.targetOverheadPercent = percent;
             return this;
         }
 
@@ -212,6 +215,12 @@ public class HeartbeatConfig {
          * Build the configuration.
          */
         public HeartbeatConfig build() {
+            // Resolve targetOverheadPercent lazily so call order doesn't matter
+            if (targetOverheadPercent > 0) {
+                this.heartbeatPeriodNanos =
+                    (long) ((100.0 / targetOverheadPercent) * promotionCostNanos);
+            }
+
             // Validate that N > τ (otherwise overhead would be > 100%)
             if (heartbeatPeriodNanos <= promotionCostNanos) {
                 throw new IllegalStateException(
@@ -222,7 +231,7 @@ public class HeartbeatConfig {
                     )
                 );
             }
-            
+
             return new HeartbeatConfig(this);
         }
     }

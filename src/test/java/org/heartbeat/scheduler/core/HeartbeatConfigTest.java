@@ -58,6 +58,20 @@ class HeartbeatConfigTest {
     }
 
     @Test
+    void testTargetOverheadPercentOrderIndependent() {
+        // targetOverheadPercent BEFORE promotionCostNanos should produce
+        // the same result as the reverse order
+        HeartbeatConfig config = HeartbeatConfig.newBuilder()
+            .targetOverheadPercent(5.0)  // 5% overhead — set before cost
+            .promotionCostMicros(2)      // τ = 2μs — set after
+            .build();
+
+        // N = (100/5) * 2μs = 40μs
+        assertThat(config.getHeartbeatPeriodNanos()).isEqualTo(40_000);
+        assertThat(config.getExpectedOverheadPercentage()).isCloseTo(5.0, within(0.01));
+    }
+
+    @Test
     void testExpectedOverheadCalculation() {
         // N = 30μs, τ = 1.5μs
         HeartbeatConfig config = HeartbeatConfig.newBuilder()
