@@ -70,16 +70,14 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
             result = compute();
             completed = true;
             return result;
-        } catch (Throwable t) {
-            exception = t;
+        } catch (Exception e) {
+            exception = e;
             completed = true;
-            if (t instanceof Exception) {
-                throw (Exception) t;
-            } else if (t instanceof Error) {
-                throw (Error) t;
-            } else {
-                throw new RuntimeException(t);
-            }
+            throw e;
+        } catch (Error e) {
+            exception = e;
+            completed = true;
+            throw e;
         }
     }
 
