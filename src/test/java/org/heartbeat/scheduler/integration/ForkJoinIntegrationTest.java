@@ -262,6 +262,22 @@ class ForkJoinIntegrationTest {
     }
 
     @Test
+    void testForkWithoutContextThrows() {
+        // Calling fork() outside of VirtualThreadExecutor should fail with a clear message
+        HeartbeatTask<Integer> parent = new HeartbeatTask<>() {
+            @Override
+            protected Integer compute() {
+                fork(new AddTask(1, 2));
+                return 0;
+            }
+        };
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(parent::call)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("HeartbeatContext");
+    }
+
+    @Test
     void testOldestTaskIsPromoted() throws ExecutionException {
         // Use a very short heartbeat so promotion is nearly guaranteed.
         // With aggressive promotion, the oldest forked task should be promoted
@@ -334,5 +350,27 @@ class ForkJoinIntegrationTest {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    @Test
+    void testExceptionInForkedChildPropagatesThroughJoin() {
+        HeartbeatTask<Integer> task = new HeartbeatTask<>() {
+            @Override
+            protected Integer compute() {
+                HeartbeatTask<Integer> failing = new HeartbeatTask<>() {
+                    @Override
+                    protected Integer compute() {
+                        throw new IllegalArgumentException("child failure");
+                    }
+                };
+                fork(failing);
+                return join(failing); // should propagate the child's exception
+            }
+        };
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> executor.submit(task))
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("child failure");
     }
 }
