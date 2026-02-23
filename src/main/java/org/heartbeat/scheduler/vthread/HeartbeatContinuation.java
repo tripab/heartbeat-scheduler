@@ -49,8 +49,8 @@ public class HeartbeatContinuation {
             throw new IllegalStateException("Cannot yield a completed continuation");
         }
         
-        Continuation.yield(scope.toJdkScope());
         hasYielded = true;
+        Continuation.yield(scope.toJdkScope());
     }
 
     /**
