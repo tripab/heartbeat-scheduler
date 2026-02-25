@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.core;
 
+import org.heartbeat.scheduler.testutil.TestConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,10 +14,7 @@ class HeartbeatContextTest {
 
     @BeforeEach
     void setUp() {
-        config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodMicros(30)
-                .promotionCostNanos(1500)
-                .build();
+        config = TestConfig.normalBuilder().build();
         pollingStrategy = CountBasedPolling.every(100);
     }
 
@@ -106,7 +104,7 @@ class HeartbeatContextTest {
         HeartbeatContext context = new HeartbeatContext(config, alwaysPoll);
 
         // Wait for heartbeat period to pass
-        Thread.sleep(1); // 1ms >> 30μs
+        Thread.sleep(TestConfig.sleepToExceed(config.getHeartbeatPeriodNanos()));
 
         boolean shouldPromote = context.checkHeartbeat();
         assertThat(shouldPromote).isTrue();
@@ -116,16 +114,10 @@ class HeartbeatContextTest {
 
     @Test
     void testRecordPromotion() throws InterruptedException {
-        // Use 50ms heartbeat period: long enough that it won't fire again
-        // immediately after reset, but short enough to keep the test fast
-        HeartbeatConfig testConfig = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodNanos(50_000_000L) // 50ms
-                .promotionCostNanos(1_500)
-                .build();
         PollingStrategy alwaysPoll = CountBasedPolling.every(1);
-        HeartbeatContext context = new HeartbeatContext(testConfig, alwaysPoll);
+        HeartbeatContext context = new HeartbeatContext(config, alwaysPoll);
 
-        Thread.sleep(60); // 60ms > 50ms — heartbeat fires
+        Thread.sleep(TestConfig.sleepToExceed(config.getHeartbeatPeriodNanos()));
 
         boolean shouldPromote = context.checkHeartbeat();
         assertThat(shouldPromote).isTrue();
@@ -134,9 +126,9 @@ class HeartbeatContextTest {
 
         assertThat(context.getTotalPromotions()).isEqualTo(1);
 
-        // After recording, timer resets — should not fire again immediately
-        shouldPromote = context.checkHeartbeat();
-        assertThat(shouldPromote).isFalse();
+        // After recording, timer resets — verify elapsed time is less than period
+        assertThat(context.getTimer().getTimeSincePromotion())
+                .isLessThan(config.getHeartbeatPeriodNanos());
     }
 
     @Test
@@ -199,7 +191,7 @@ class HeartbeatContextTest {
         assertThat(context.getPromotionRate()).isCloseTo(0.0, within(0.01));
 
         // Wait and cause a promotion
-        Thread.sleep(1);
+        Thread.sleep(TestConfig.sleepToExceed(config.getHeartbeatPeriodNanos()));
         context.checkHeartbeat();
         context.recordPromotion();
 
@@ -287,7 +279,7 @@ class HeartbeatContextTest {
         assertThat(timer.shouldPromote()).isFalse();
 
         // After delay, should be ready
-        Thread.sleep(1);
+        Thread.sleep(TestConfig.sleepToExceed(config.getHeartbeatPeriodNanos()));
         assertThat(timer.shouldPromote()).isTrue();
     }
 

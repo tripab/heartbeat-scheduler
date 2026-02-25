@@ -2,6 +2,7 @@ package org.heartbeat.scheduler.executor;
 
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.task.HeartbeatTask;
+import org.heartbeat.scheduler.testutil.TestConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,9 +19,7 @@ class VirtualThreadExecutorTest {
 
     @BeforeEach
     void setUp() {
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodNanos(30_000)
-                .promotionCostNanos(1_500)
+        HeartbeatConfig config = TestConfig.normalBuilder()
                 .enableStatistics(true)
                 .build();
         executor = new VirtualThreadExecutor(config);
@@ -97,7 +96,7 @@ class VirtualThreadExecutorTest {
     @Test
     void testConfig() {
         assertThat(executor.getConfig()).isNotNull();
-        assertThat(executor.getConfig().getHeartbeatPeriodNanos()).isEqualTo(30_000);
+        assertThat(executor.getConfig().getHeartbeatPeriodNanos()).isEqualTo(TestConfig.normalPeriodNanos());
     }
 
     @Test
@@ -108,10 +107,7 @@ class VirtualThreadExecutorTest {
 
     @Test
     void testAutoCloseable() throws Exception {
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodNanos(30_000)
-                .promotionCostNanos(1_500)
-                .build();
+        HeartbeatConfig config = TestConfig.normalBuilder().build();
 
         VirtualThreadExecutor autoCloseExecutor;
         try (VirtualThreadExecutor exec = new VirtualThreadExecutor(config)) {

@@ -3,6 +3,7 @@ package org.heartbeat.scheduler.integration;
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
+import org.heartbeat.scheduler.testutil.TestConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,9 +25,7 @@ class ForkJoinIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodNanos(5_000)   // 5μs - short period for testing
-                .promotionCostNanos(500)
+        HeartbeatConfig config = TestConfig.normalBuilder()
                 .enableStatistics(true)
                 .build();
         executor = new VirtualThreadExecutor(config);
@@ -245,9 +244,7 @@ class ForkJoinIntegrationTest {
     @Test
     void testDeepRecursionTriggersPromotions() throws ExecutionException {
         // Use aggressive heartbeat to guarantee promotions on a deep recursive task
-        HeartbeatConfig aggressiveConfig = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodNanos(100)
-                .promotionCostNanos(1)
+        HeartbeatConfig aggressiveConfig = TestConfig.aggressiveBuilder()
                 .enableStatistics(true)
                 .build();
 
@@ -282,9 +279,7 @@ class ForkJoinIntegrationTest {
         // Use a very short heartbeat so promotion is nearly guaranteed.
         // With aggressive promotion, the oldest forked task should be promoted
         // and results should still be correct (verifying the right task runs).
-        HeartbeatConfig aggressiveConfig = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodNanos(100)  // very short period for aggressive promotion
-                .promotionCostNanos(1)
+        HeartbeatConfig aggressiveConfig = TestConfig.aggressiveBuilder()
                 .enableStatistics(true)
                 .build();
         VirtualThreadExecutor aggressiveExecutor = new VirtualThreadExecutor(aggressiveConfig);
