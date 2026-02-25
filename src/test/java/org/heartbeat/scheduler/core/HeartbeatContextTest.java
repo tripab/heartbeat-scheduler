@@ -116,10 +116,16 @@ class HeartbeatContextTest {
 
     @Test
     void testRecordPromotion() throws InterruptedException {
+        // Use 50ms heartbeat period: long enough that it won't fire again
+        // immediately after reset, but short enough to keep the test fast
+        HeartbeatConfig testConfig = HeartbeatConfig.newBuilder()
+                .heartbeatPeriodNanos(50_000_000L) // 50ms
+                .promotionCostNanos(1_500)
+                .build();
         PollingStrategy alwaysPoll = CountBasedPolling.every(1);
-        HeartbeatContext context = new HeartbeatContext(config, alwaysPoll);
+        HeartbeatContext context = new HeartbeatContext(testConfig, alwaysPoll);
 
-        Thread.sleep(1); // Wait for heartbeat
+        Thread.sleep(60); // 60ms > 50ms — heartbeat fires
 
         boolean shouldPromote = context.checkHeartbeat();
         assertThat(shouldPromote).isTrue();
@@ -128,7 +134,7 @@ class HeartbeatContextTest {
 
         assertThat(context.getTotalPromotions()).isEqualTo(1);
 
-        // After recording, timer should reset
+        // After recording, timer resets — should not fire again immediately
         shouldPromote = context.checkHeartbeat();
         assertThat(shouldPromote).isFalse();
     }
