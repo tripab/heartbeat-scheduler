@@ -102,6 +102,19 @@ public class HeartbeatContext {
     }
 
     /**
+     * Static entry point for PRC-rewritten code. Safe to call from any thread;
+     * delegates to the current context's checkHeartbeat() if one is installed,
+     * otherwise returns false immediately (so instrumented code is safe outside
+     * the executor).
+     *
+     * @return true if it's time to promote
+     */
+    public static boolean checkHeartbeatStatic() {
+        HeartbeatContext ctx = CONTEXT.get();
+        return ctx != null && ctx.checkHeartbeat();
+    }
+
+    /**
      * Check if we should poll and promote.
      * Called at instrumentation points in the code.
      * <p>
