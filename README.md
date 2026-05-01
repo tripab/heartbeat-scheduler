@@ -236,15 +236,27 @@ class SumTask extends HeartbeatTask<Long> {
 
 ## Running Examples
 
+Each example needs `--add-exports java.base/jdk.internal.vm=ALL-UNNAMED`
+on the JVM command line so the runtime can reach `jdk.internal.vm.Continuation`.
+
 ```bash
 # Compile
 mvn clean compile
 
-# Run Fibonacci benchmark
-java -cp target/classes org.heartbeat.examples.FibonacciExample 20
+# Recursive Fibonacci with heartbeat fork/join (default n=20)
+java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+    -cp target/classes \
+    org.heartbeat.scheduler.examples.FibonacciExample 20
 
-# Run parallel sum benchmark
-java -cp target/classes org.heartbeat.examples.ParallelSumExample 1000000 10000
+# Parallel range reduction with a CPU-bound LCG kernel
+java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+    -cp target/classes \
+    org.heartbeat.scheduler.examples.ParallelSumExample 1000000 10000
+
+# Same reduction with a deliberately skewed (1:9) split
+java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+    -cp target/classes \
+    org.heartbeat.scheduler.examples.RecursiveSumExample 1000000 10000
 ```
 
 ## Implementation Details
