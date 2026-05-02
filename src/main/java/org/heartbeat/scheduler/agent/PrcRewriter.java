@@ -2,18 +2,17 @@ package org.heartbeat.scheduler.agent;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.JumpInsnNode;
-import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +31,10 @@ public class PrcRewriter {
     /** Internal name of @Parallel, as it appears in class-file descriptors. */
     private static final String PARALLEL_DESC =
             "Lorg/heartbeat/scheduler/annotations/Parallel;";
+
+    /** Internal name of @HeartbeatPoll, as it appears in class-file descriptors. */
+    private static final String HEARTBEAT_POLL_DESC =
+            "Lorg/heartbeat/scheduler/annotations/HeartbeatPoll;";
 
     /** The static poll method the rewriter injects calls to. */
     static final String CONTEXT_OWNER =
@@ -91,10 +94,15 @@ public class PrcRewriter {
     /**
      * Insert poll calls into a single method.
      *
-     * Strategy: insert before each backedge jump and at method entry.
+     * Strategy: insert before each selected backedge jump and at method entry.
      * We insert a poll that returns a boolean but we discard the value (POP).
      * The actual promotion side-effect happens inside checkHeartbeatStatic()
      * via HeartbeatTask.yield().
+     *
+     * If the method carries {@code @HeartbeatPoll(every=N)}, only every N-th
+     * backedge (0-indexed, ascending CFG order) receives a poll — reducing
+     * polling overhead in tight inner loops. With N=1 (the default) all
+     * backedges are polled, preserving existing behaviour.
      *
      * Insert order: backedges first (using indices from the unmodified list),
      * then prepend the entry poll. This avoids invalidating the backedge
@@ -102,15 +110,20 @@ public class PrcRewriter {
      */
     private static void rewriteMethod(MethodNode mn) {
         Set<Integer> backedgeIndices = BackedgeAnalyzer.findBackedgeIndices(mn);
+        int everyN = getEveryN(mn);
 
         // Convert instruction list to an array snapshot so indices remain stable.
         AbstractInsnNode[] insns = mn.instructions.toArray();
 
-        // Insert poll before each backedge jump (iterate in reverse order so
-        // insertion doesn't shift later indices).
-        int[] sorted = backedgeIndices.stream().mapToInt(Integer::intValue)
-                .boxed().sorted((a, b) -> b - a).mapToInt(Integer::intValue).toArray();
-        for (int idx : sorted) {
+        // Sort ascending to apply the every-N selection in CFG order, then
+        // descend for safe in-place insertion (later indices first).
+        int[] ascending = backedgeIndices.stream().mapToInt(Integer::intValue).sorted().toArray();
+        List<Integer> selected = new ArrayList<>();
+        for (int i = 0; i < ascending.length; i++) {
+            if (i % everyN == 0) selected.add(ascending[i]);
+        }
+        selected.sort(Comparator.reverseOrder());
+        for (int idx : selected) {
             mn.instructions.insertBefore(insns[idx], pollSequence());
         }
 
@@ -124,6 +137,37 @@ public class PrcRewriter {
         } else {
             mn.instructions.insert(pollSequence());
         }
+    }
+
+    /**
+     * Returns the {@code @HeartbeatPoll(every=N)} value for the given method,
+     * or 1 if the annotation is absent (poll every backedge).
+     */
+    private static int getEveryN(MethodNode mn) {
+        int result = findEveryN(mn.visibleAnnotations);
+        if (result >= 0) return result;
+        result = findEveryN(mn.invisibleAnnotations);
+        if (result >= 0) return result;
+        return 1; // annotation absent — poll every backedge
+    }
+
+    /** Returns the every=N value if found in {@code anns}, or -1 if not present. */
+    private static int findEveryN(List<AnnotationNode> anns) {
+        if (anns == null) return -1;
+        for (AnnotationNode ann : anns) {
+            if (HEARTBEAT_POLL_DESC.equals(ann.desc)) {
+                if (ann.values != null) {
+                    for (int i = 0; i + 1 < ann.values.size(); i += 2) {
+                        if ("every".equals(ann.values.get(i))) {
+                            Object v = ann.values.get(i + 1);
+                            if (v instanceof Integer n) return Math.max(1, n);
+                        }
+                    }
+                }
+                return 1; // annotation present, no explicit value — use default
+            }
+        }
+        return -1;
     }
 
     /**

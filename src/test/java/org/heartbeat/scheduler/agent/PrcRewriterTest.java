@@ -89,12 +89,19 @@ class PrcRewriterTest {
     // =========================================================================
 
     /**
-     * Build a class file byte array containing one method with the @Parallel
-     * annotation (using the exact descriptor PrcRewriter checks).
+     * Build a class file byte array with @Parallel on the method.
+     */
+    private byte[] buildFixtureClass(String className, FixtureBuilder body) {
+        return buildFixtureClass(className, 0, body);
+    }
+
+    /**
+     * Build a class file byte array with @Parallel and, when {@code every > 0},
+     * also @HeartbeatPoll(every=N) on the method.
      *
      * @param methodBody  a Consumer-style callback that populates the method
      */
-    private byte[] buildFixtureClass(String className, FixtureBuilder body) {
+    private byte[] buildFixtureClass(String className, int every, FixtureBuilder body) {
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
         cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
 
@@ -111,8 +118,15 @@ class PrcRewriterTest {
         org.objectweb.asm.MethodVisitor mv = cw.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
                 "parallelMethod", "()V", null, null);
-        // Add @Parallel invisible annotation (CLASS retention → invisible at runtime)
+        // @Parallel (CLASS retention → invisible at runtime)
         mv.visitAnnotation("Lorg/heartbeat/scheduler/annotations/Parallel;", false).visitEnd();
+        // @HeartbeatPoll(every=N) when requested
+        if (every > 0) {
+            org.objectweb.asm.AnnotationVisitor av = mv.visitAnnotation(
+                    "Lorg/heartbeat/scheduler/annotations/HeartbeatPoll;", false);
+            av.visit("every", every);
+            av.visitEnd();
+        }
         body.build(mv);
         mv.visitEnd();
 
@@ -235,6 +249,44 @@ class PrcRewriterTest {
         // 1 entry + 2 backedges = 3 polls
         assertThat(countPolls(rewritten, "parallelMethod"))
                 .as("nested-loop method should get 3 polls: entry + 2 backedges")
+                .isEqualTo(3);
+    }
+
+    /**
+     * @HeartbeatPoll(every=2) on a method with 4 sequential loops inserts a
+     * poll only at the 1st and 3rd backedges (0-indexed positions 0 and 2),
+     * plus the entry poll — 3 polls total instead of 5.
+     */
+    @Test
+    void heartbeatPollEvery2_reducesBackedgePolls() {
+        byte[] original = buildFixtureClass("TestHeartbeatPollEvery2", 2, mv -> {
+            mv.visitCode();
+            // 4 sequential loops — each contributes 1 backedge
+            for (int loop = 0; loop < 4; loop++) {
+                org.objectweb.asm.Label check = new org.objectweb.asm.Label();
+                org.objectweb.asm.Label end   = new org.objectweb.asm.Label();
+                mv.visitInsn(Opcodes.ICONST_0);
+                mv.visitVarInsn(Opcodes.ISTORE, 0);
+                mv.visitLabel(check);
+                mv.visitVarInsn(Opcodes.ILOAD, 0);
+                mv.visitIntInsn(Opcodes.BIPUSH, 3);
+                mv.visitJumpInsn(Opcodes.IF_ICMPGE, end);
+                mv.visitIincInsn(0, 1);
+                mv.visitJumpInsn(Opcodes.GOTO, check); // backedge
+                mv.visitLabel(end);
+            }
+            mv.visitInsn(Opcodes.RETURN);
+            mv.visitMaxs(2, 1);
+        });
+
+        byte[] rewritten = rewriter.rewrite(original, null);
+
+        assertThat(rewritten).isNotSameAs(original);
+        assertVerifies(rewritten);
+        // every=2 selects backedges at ascending positions 0 and 2 (out of 4)
+        // → 1 entry poll + 2 backedge polls = 3 total
+        assertThat(countPolls(rewritten, "parallelMethod"))
+                .as("every=2 should yield 1 entry + 2 backedge polls (positions 0 and 2 of 4)")
                 .isEqualTo(3);
     }
 
