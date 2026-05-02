@@ -247,13 +247,13 @@ Verify the (1+τ/N)·w bound experimentally; compare against ForkJoinPool / plai
 | 25 | Add ASM-tree unit tests for PrcRewriter | done | 231185c |
 | 26 | Add agent integration test | done | 231185c |
 | 27 | Write docs/prc-rewriter.md design note | done | 231185c |
-| 28 | Write docs/loom-integration.md | pending | |
-| 29 | Implement FibBench (JMH) | pending | |
-| 30 | Implement QuicksortBench (JMH) | pending | |
-| 31 | Implement MatmulBench (JMH) | pending | |
-| 32 | Implement BfsBench (JMH) | pending | |
-| 33 | Add JFR event source | pending | |
-| 34 | Implement scripts/visualize-jfr.py | pending | |
+| 28 | Write docs/loom-integration.md | done | f63d051 |
+| 29 | Implement FibBench (JMH) | done | da6c9fb |
+| 30 | Implement QuicksortBench (JMH) | done | da6c9fb |
+| 31 | Implement MatmulBench (JMH) | done | da6c9fb |
+| 32 | Implement BfsBench (JMH) | done | da6c9fb |
+| 33 | Add JFR event source | done | f63d051 |
+| 34 | Implement scripts/visualize-jfr.py | done | f63d051 |
 | 35 | Configure JMH source set in pom.xml | pending | |
 | 36 | Implement BoundsBench (τ/N sweep) | pending | |
 | 37 | Implement comparative benchmark harness | pending | |
