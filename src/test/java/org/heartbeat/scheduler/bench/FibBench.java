@@ -23,9 +23,9 @@ import java.util.concurrent.*;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 3, time = 1)
-@Measurement(iterations = 5, time = 1)
-@Fork(value = 1, jvmArgsPrepend = "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED")
+@Warmup(iterations = 5, time = 2)
+@Measurement(iterations = 10, time = 2)
+@Fork(value = 3, jvmArgsPrepend = "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED")
 public class FibBench {
 
     @Param({"30", "35"})

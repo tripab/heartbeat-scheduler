@@ -56,14 +56,14 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- JMH for benchmarking -->
+        <!-- JMH for benchmarking (test scope: compile + run via exec plugin) -->
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
             <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
-        
+
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-generator-annprocess</artifactId>
@@ -148,4 +148,45 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          benchmarks profile — compile test sources and run all JMH benchmarks.
+
+          Usage:
+            mvn test-compile exec:java -Pbenchmarks
+              -Dexec.args="BoundsBench -rf json -rff docs/results/bounds.json"
+
+          Or run everything with JSON output:
+            mvn test-compile exec:java -Pbenchmarks
+
+          The exec plugin launches org.openjdk.jmh.Main on the test classpath.
+          JMH then forks fresh JVMs (one per @Fork iteration) for isolated results.
+          Each benchmark class carries @Fork(jvmArgsPrepend = "...add-exports...")
+          so the forked JVMs can access jdk.internal.vm.Continuation.
+        -->
+        <profile>
+            <id>benchmarks</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.2.0</version>
+                        <configuration>
+                            <mainClass>org.openjdk.jmh.Main</mainClass>
+                            <classpathScope>test</classpathScope>
+                            <arguments>
+                                <argument>-rf</argument>
+                                <argument>json</argument>
+                                <argument>-rff</argument>
+                                <argument>docs/results/jmh-results.json</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
