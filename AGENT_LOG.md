@@ -255,7 +255,7 @@ Verify the (1+τ/N)·w bound experimentally; compare against ForkJoinPool / plai
 | 33 | Add JFR event source | done | f63d051 |
 | 34 | Implement scripts/visualize-jfr.py | done | f63d051 |
 | 35 | Configure JMH source set in pom.xml | done | |
-| 36 | Implement BoundsBench (τ/N sweep) | pending | |
+| 36 | Implement BoundsBench (τ/N sweep) | done | |
 | 37 | Implement comparative benchmark harness | pending | |
 | 38 | Implement scripts/plot-results.py | pending | |
 | 39 | Rewrite README for portfolio quality | pending | |
