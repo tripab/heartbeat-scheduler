@@ -258,5 +258,5 @@ Verify the (1+τ/N)·w bound experimentally; compare against ForkJoinPool / plai
 | 36 | Implement BoundsBench (τ/N sweep) | done | |
 | 37 | Implement comparative benchmark harness | done | |
 | 38 | Implement scripts/plot-results.py | done | |
-| 39 | Rewrite README for portfolio quality | pending | |
+| 39 | Rewrite README for portfolio quality | done | |
 | 40 | Record demo GIF | pending | |
