@@ -12,8 +12,8 @@ import jdk.jfr.*;
  *   <li>{@link JoinBlockedEvent} — when join() blocks waiting for a promoted task to finish</li>
  * </ul>
  *
- * <p>All events check {@code isEnabled()} internally; emission overhead when no JFR
- * recording is active is a single branch that the JIT eliminates.
+ * <p>Each call site guards allocation with {@code XxxEvent.isEnabled()} so that
+ * no objects are allocated when no JFR recording is active.
  *
  * <p>View in Java Mission Control or parse with:
  * <pre>{@code jfr print --events org.heartbeat.scheduler.Promotion recording.jfr}</pre>

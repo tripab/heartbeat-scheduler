@@ -136,9 +136,11 @@ public class HeartbeatContext {
 
             if (timer.shouldPromote()) {
                 HeartbeatEvents.PollCheckEvent jfr = new HeartbeatEvents.PollCheckEvent();
-                jfr.totalPolls = totalPolls;
-                jfr.totalPromotions = totalPromotions;
-                jfr.commit();
+                if (jfr.isEnabled()) {
+                    jfr.totalPolls = totalPolls;
+                    jfr.totalPromotions = totalPromotions;
+                    jfr.commit();
+                }
                 return true;
             }
         }

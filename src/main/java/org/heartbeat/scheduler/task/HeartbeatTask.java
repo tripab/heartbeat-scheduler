@@ -129,10 +129,12 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
                 if (oldestTask.promotedFuture.compareAndSet(null, future)) {
                     context.recordPromotion();
                     HeartbeatEvents.PromotionEvent jfr = new HeartbeatEvents.PromotionEvent();
-                    jfr.carrier = Thread.currentThread().getName();
-                    jfr.frameAgeNanos = oldest.getAgeNanos();
-                    jfr.framesInFlight = tracker.size();
-                    jfr.commit();
+                    if (jfr.isEnabled()) {
+                        jfr.carrier = Thread.currentThread().getName();
+                        jfr.frameAgeNanos = oldest.getAgeNanos();
+                        jfr.framesInFlight = tracker.size();
+                        jfr.commit();
+                    }
                 } else {
                     // Another thread already promoted this task; cancel our submission
                     future.cancel(false);
@@ -158,9 +160,12 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
         CompletableFuture<U> future = task.promotedFuture.get();
         if (future != null) {
             HeartbeatEvents.JoinBlockedEvent jfr = new HeartbeatEvents.JoinBlockedEvent();
-            jfr.begin();
-            jfr.carrier = Thread.currentThread().getName();
-            jfr.taskAgeNanos = task.getAgeNanos();
+            boolean jfrEnabled = jfr.isEnabled();
+            if (jfrEnabled) {
+                jfr.begin();
+                jfr.carrier = Thread.currentThread().getName();
+                jfr.taskAgeNanos = task.getAgeNanos();
+            }
             try {
                 return future.get();
             } catch (InterruptedException e) {
@@ -172,7 +177,7 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
                 if (cause instanceof Error er) throw er;
                 throw new RuntimeException(cause);
             } finally {
-                jfr.commit();
+                if (jfrEnabled) jfr.commit();
             }
         }
 
