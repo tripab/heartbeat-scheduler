@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.core;
 
-import org.heartbeat.scheduler.jfr.HeartbeatEvents;
 
 /**
  * Thread-local context for each carrier thread.
@@ -135,12 +134,7 @@ public class HeartbeatContext {
             pollingStrategy.recordPoll();
 
             if (timer.shouldPromote()) {
-                HeartbeatEvents.PollCheckEvent jfr = new HeartbeatEvents.PollCheckEvent();
-                if (jfr.isEnabled()) {
-                    jfr.totalPolls = totalPolls;
-                    jfr.totalPromotions = totalPromotions;
-                    jfr.commit();
-                }
+                config.getObserver().onPollCheck(totalPolls, totalPromotions);
                 return true;
             }
         }

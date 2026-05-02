@@ -3,7 +3,7 @@ package org.heartbeat.scheduler.task;
 import org.heartbeat.scheduler.core.HeartbeatContext;
 import org.heartbeat.scheduler.core.PromotionTracker;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
-import org.heartbeat.scheduler.jfr.HeartbeatEvents;
+
 import org.heartbeat.scheduler.sync.PromotionPoint;
 import org.heartbeat.scheduler.vthread.ContinuationScope;
 import org.heartbeat.scheduler.vthread.HeartbeatContinuation;
@@ -128,13 +128,10 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
                 CompletableFuture<Object> future = executor.promoteTask(oldestTask);
                 if (oldestTask.promotedFuture.compareAndSet(null, future)) {
                     context.recordPromotion();
-                    HeartbeatEvents.PromotionEvent jfr = new HeartbeatEvents.PromotionEvent();
-                    if (jfr.isEnabled()) {
-                        jfr.carrier = Thread.currentThread().getName();
-                        jfr.frameAgeNanos = oldest.getAgeNanos();
-                        jfr.framesInFlight = tracker.size();
-                        jfr.commit();
-                    }
+                    context.getConfig().getObserver().onPromotion(
+                            Thread.currentThread().getName(),
+                            oldest.getAgeNanos(),
+                            tracker.size());
                 } else {
                     // Another thread already promoted this task; cancel our submission
                     future.cancel(false);
@@ -159,13 +156,11 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
         // Atomically read the promoted future to prevent race with fork()
         CompletableFuture<U> future = task.promotedFuture.get();
         if (future != null) {
-            HeartbeatEvents.JoinBlockedEvent jfr = new HeartbeatEvents.JoinBlockedEvent();
-            boolean jfrEnabled = jfr.isEnabled();
-            if (jfrEnabled) {
-                jfr.begin();
-                jfr.carrier = Thread.currentThread().getName();
-                jfr.taskAgeNanos = task.getAgeNanos();
-            }
+            HeartbeatContext context = HeartbeatContext.current();
+            Runnable endJoin = context != null
+                    ? context.getConfig().getObserver().startJoinBlocked(
+                            Thread.currentThread().getName(), task.getAgeNanos())
+                    : () -> {};
             try {
                 return future.get();
             } catch (InterruptedException e) {
@@ -177,7 +172,7 @@ public abstract class HeartbeatTask<T> implements Callable<T> {
                 if (cause instanceof Error er) throw er;
                 throw new RuntimeException(cause);
             } finally {
-                if (jfrEnabled) jfr.commit();
+                endJoin.run();
             }
         }
 

@@ -19,6 +19,7 @@ public class HeartbeatConfig {
     private final boolean enableStatistics;
     private final boolean enableDebugLogging;
     private final Supplier<PollingStrategy> pollingStrategyFactory;
+    private final HeartbeatObserver observer;
 
     private HeartbeatConfig(Builder builder) {
         this.heartbeatPeriodNanos = builder.heartbeatPeriodNanos;
@@ -27,6 +28,7 @@ public class HeartbeatConfig {
         this.enableStatistics = builder.enableStatistics;
         this.enableDebugLogging = builder.enableDebugLogging;
         this.pollingStrategyFactory = builder.pollingStrategyFactory;
+        this.observer = builder.observer;
     }
 
     public long getHeartbeatPeriodNanos() {
@@ -47,6 +49,10 @@ public class HeartbeatConfig {
 
     public boolean isDebugLoggingEnabled() {
         return enableDebugLogging;
+    }
+
+    public HeartbeatObserver getObserver() {
+        return observer;
     }
 
     /**
@@ -110,6 +116,7 @@ public class HeartbeatConfig {
         
         private boolean enableStatistics = false;
         private boolean enableDebugLogging = false;
+        private HeartbeatObserver observer = HeartbeatObserver.NOOP;
 
         // If set (> 0), targetOverheadPercent is resolved lazily in build()
         // to compute heartbeatPeriodNanos from the final promotionCostNanos.
@@ -208,6 +215,16 @@ public class HeartbeatConfig {
                 throw new IllegalArgumentException("Polling strategy factory cannot be null");
             }
             this.pollingStrategyFactory = factory;
+            return this;
+        }
+
+        /**
+         * Set the observability backend. Defaults to {@link HeartbeatObserver#NOOP}.
+         * Use {@code JfrHeartbeatObserver.INSTANCE} to enable JFR event emission.
+         */
+        public Builder observer(HeartbeatObserver observer) {
+            if (observer == null) throw new IllegalArgumentException("Observer cannot be null");
+            this.observer = observer;
             return this;
         }
 
