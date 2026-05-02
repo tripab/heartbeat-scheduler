@@ -3,12 +3,13 @@ package org.heartbeat.scheduler.agent;
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.core.HeartbeatContext;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
+import org.heartbeat.scheduler.task.HeartbeatTask;
+import org.heartbeat.scheduler.testutil.TestConfig;
 import org.junit.jupiter.api.Test;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.Callable;
@@ -190,6 +191,51 @@ class AgentIntegrationTest {
         }
         // 1 entry poll + 1 backedge poll = 2
         assertThat(polls).as("countDown has 1 loop → 2 polls (entry + backedge)").isEqualTo(2);
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Agent-instrumented code path: promotions fire under executor
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies the headline R1 claim: code running under VirtualThreadExecutor
+     * with an aggressive heartbeat config actually triggers promotions.
+     * fib(20) produces enough fork() calls that at least one frame is promoted
+     * before the computation completes.
+     */
+    @Test
+    void promotableTask_triggersPromotions_underExecutor() throws Exception {
+        HeartbeatConfig config = TestConfig.aggressiveBuilder()
+                .enableStatistics(true)
+                .build();
+
+        try (VirtualThreadExecutor executor = new VirtualThreadExecutor(config)) {
+            long result = executor.submit(new AgentFibTask(20));
+
+            assertThat(result)
+                    .as("fib(20) should equal 6765")
+                    .isEqualTo(6765L);
+            assertThat(executor.getTotalPromotionsPerformed())
+                    .as("At least one fork should be promoted with aggressive heartbeat config (period=%dns)",
+                            config.getHeartbeatPeriodNanos())
+                    .isGreaterThan(0);
+        }
+    }
+
+    private static final class AgentFibTask extends HeartbeatTask<Long> {
+        private final int n;
+
+        AgentFibTask(int n) { this.n = n; }
+
+        @Override
+        protected Long compute() {
+            if (n <= 1) return (long) n;
+            AgentFibTask f1 = new AgentFibTask(n - 1);
+            AgentFibTask f2 = new AgentFibTask(n - 2);
+            fork(f1);
+            fork(f2);
+            return join(f1) + join(f2);
+        }
     }
 
     // -------------------------------------------------------------------------
