@@ -14,7 +14,14 @@ import java.lang.instrument.Instrumentation;
 public class PrcAgent {
 
     public static void premain(String args, Instrumentation inst) {
-        AgentConfig config = AgentConfig.parse(args);
-        inst.addTransformer(new PrcClassTransformer(config));
+        inst.addTransformer(new PrcClassTransformer(parseVerbose(args)));
+    }
+
+    private static boolean parseVerbose(String args) {
+        if (args == null || args.isBlank()) return false;
+        for (String token : args.split(",")) {
+            if ("verbose".equalsIgnoreCase(token.strip())) return true;
+        }
+        return false;
     }
 }

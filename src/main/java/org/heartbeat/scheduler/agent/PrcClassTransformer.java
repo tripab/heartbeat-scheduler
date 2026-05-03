@@ -12,11 +12,11 @@ import java.security.ProtectionDomain;
  */
 public class PrcClassTransformer implements ClassFileTransformer {
 
-    private final AgentConfig config;
+    private final boolean verbose;
     private final PrcRewriter rewriter = new PrcRewriter();
 
-    public PrcClassTransformer(AgentConfig config) {
-        this.config = config;
+    public PrcClassTransformer(boolean verbose) {
+        this.verbose = verbose;
     }
 
     @Override
@@ -41,7 +41,7 @@ public class PrcClassTransformer implements ClassFileTransformer {
 
         try {
             byte[] result = rewriter.rewrite(classfileBuffer, loader);
-            if (result != classfileBuffer && config.verbose) {
+            if (result != classfileBuffer && verbose) {
                 System.err.println("[PrcAgent] Instrumented: " + className.replace('/', '.'));
             }
             // Return null when unmodified — ClassFileTransformer contract: null = no change.

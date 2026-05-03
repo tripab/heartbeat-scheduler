@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 class PrcClassTransformerTest {
 
     private final PrcClassTransformer transformer =
-            new PrcClassTransformer(AgentConfig.parse(null));
+            new PrcClassTransformer(false);
 
     // =========================================================================
     // Skip rules
