@@ -17,10 +17,4 @@ public class PrcAgent {
         AgentConfig config = AgentConfig.parse(args);
         inst.addTransformer(new PrcClassTransformer(config));
     }
-
-    // premain without Instrumentation — not needed but required by spec when
-    // the two-argument form is absent; keep for completeness.
-    public static void premain(String args) {
-        throw new IllegalStateException("Instrumentation argument required");
-    }
 }
