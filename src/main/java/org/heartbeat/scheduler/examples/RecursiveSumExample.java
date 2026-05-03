@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.examples;
 
+import org.heartbeat.scheduler.annotations.Parallel;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
@@ -98,6 +99,7 @@ public final class RecursiveSumExample {
         }
 
         @Override
+        @Parallel
         protected Long compute() {
             if (end - start <= threshold) {
                 return ExamplesSupport.rangeSum(start, end);

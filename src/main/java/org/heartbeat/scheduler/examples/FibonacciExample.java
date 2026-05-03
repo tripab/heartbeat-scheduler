@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.examples;
 
+import org.heartbeat.scheduler.annotations.Parallel;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
@@ -54,6 +55,7 @@ public final class FibonacciExample {
         }
 
         @Override
+        @Parallel
         protected Long compute() {
             if (n <= 1) return (long) n;
             FibTask f1 = new FibTask(n - 1);
