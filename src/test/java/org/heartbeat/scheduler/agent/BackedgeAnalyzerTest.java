@@ -40,13 +40,13 @@ class BackedgeAnalyzerTest {
 
     /** MethodNode with no instructions at all returns empty set without throwing. */
     @Test
-    void emptyMethod_returnsEmpty() {
+    void emptyMethodReturnsEmpty() {
         assertThat(BackedgeAnalyzer.findBackedgeIndices(emptyMethod())).isEmpty();
     }
 
     /** Straight-line method (no jumps) reports no backedges. */
     @Test
-    void straightLine_noBackedges() {
+    void straightLineNoBackedges() {
         MethodNode mn = emptyMethod();
         mn.instructions.add(new InsnNode(ICONST_0));
         mn.instructions.add(new InsnNode(IRETURN));
@@ -56,7 +56,7 @@ class BackedgeAnalyzerTest {
 
     /** Forward conditional jump (if-else without loop) is not a backedge. */
     @Test
-    void forwardConditionalJump_noBackedges() {
+    void forwardConditionalJumpNoBackedges() {
         MethodNode mn = emptyMethod();
         LabelNode thenLabel = new LabelNode();
         LabelNode endLabel  = new LabelNode();
@@ -75,7 +75,7 @@ class BackedgeAnalyzerTest {
 
     /** Simple while-loop with GOTO back: the GOTO is the only backedge. */
     @Test
-    void gotoWhileLoop_gotoIsBackedge() {
+    void gotoWhileLoopGotoIsBackedge() {
         MethodNode mn = emptyMethod();
         LabelNode loopLabel = new LabelNode();
         LabelNode endLabel  = new LabelNode();
@@ -98,7 +98,7 @@ class BackedgeAnalyzerTest {
 
     /** do-while loop with conditional backward jump: the conditional jump is a backedge. */
     @Test
-    void doWhileLoop_conditionalJumpIsBackedge() {
+    void doWhileLoopConditionalJumpIsBackedge() {
         MethodNode mn = emptyMethod();
         LabelNode loopLabel = new LabelNode();
 
@@ -118,7 +118,7 @@ class BackedgeAnalyzerTest {
 
     /** Nested loops produce exactly two backedges — one per loop. */
     @Test
-    void nestedLoops_twoBackedges() {
+    void nestedLoopsTwoBackedges() {
         MethodNode mn = emptyMethod();
         LabelNode outerLoop = new LabelNode();
         LabelNode outerEnd  = new LabelNode();
@@ -160,7 +160,7 @@ class BackedgeAnalyzerTest {
      * backedges — this is the "switch elision" behaviour noted in BackedgeAnalyzer.
      */
     @Test
-    void lookupSwitch_noBackedges() {
+    void lookupSwitchNoBackedges() {
         MethodNode mn = new MethodNode(0, "test", "(I)V", null, null);
         LabelNode case0 = new LabelNode();
         LabelNode case1 = new LabelNode();
@@ -192,7 +192,7 @@ class BackedgeAnalyzerTest {
      * The method-entry poll provides coverage for the handler path.
      */
     @Test
-    void exceptionHandler_mainBackedgeDetected_handlerBackedgeSkipped() {
+    void exceptionHandlerMainBackedgeDetectedHandlerBackedgeSkipped() {
         MethodNode mn = emptyMethod();
         LabelNode loopLabel    = new LabelNode();
         LabelNode loopEnd      = new LabelNode();
@@ -249,7 +249,7 @@ class BackedgeAnalyzerTest {
      * method-entry poll provides base coverage.
      */
     @Test
-    void irreducibleCFG_cycleEdgeNotABackedge() {
+    void irreducibleCfgCycleEdgeNotABackedge() {
         MethodNode mn = new MethodNode(0, "test", "(I)V", null, null);
         LabelNode nodeA = new LabelNode();
         LabelNode nodeB = new LabelNode();

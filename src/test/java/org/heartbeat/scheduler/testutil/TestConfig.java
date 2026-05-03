@@ -88,6 +88,22 @@ public final class TestConfig {
     }
 
     /**
+     * Config builder where the heartbeat fires on the very first timer check.
+     *
+     * Uses the minimum valid (period=2ns, cost=1ns) pair — not calibrated because
+     * this scenario is machine-independent: any JVM operation takes far longer than
+     * 2 ns, so the timer is already elapsed before the first shouldPromote() call.
+     *
+     * Use this when a test needs timer.shouldPromote() to return true immediately
+     * rather than "after some real-time elapses".
+     */
+    public static HeartbeatConfig.Builder instantFireBuilder() {
+        return HeartbeatConfig.newBuilder()
+                .heartbeatPeriodNanos(2)
+                .promotionCostNanos(1);
+    }
+
+    /**
      * Get the raw calibration results for tests that need direct access.
      */
     public static TimingCalibration.CalibrationResults calibration() {

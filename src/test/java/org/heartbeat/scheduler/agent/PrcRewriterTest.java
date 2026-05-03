@@ -150,7 +150,7 @@ class PrcRewriterTest {
 
     /** A method with no loops gets exactly one poll (at entry). */
     @Test
-    void noLoop_entryPollInserted() {
+    void noLoopEntryPollInserted() {
         byte[] original = buildFixtureClass("TestNoLoop", mv -> {
             mv.visitCode();
             mv.visitInsn(Opcodes.RETURN);
@@ -168,7 +168,7 @@ class PrcRewriterTest {
 
     /** A method with a simple loop gets entry poll + backedge poll = 2 polls. */
     @Test
-    void simpleLoop_backedgePollInserted() {
+    void simpleLoopBackedgePollInserted() {
         byte[] original = buildFixtureClass("TestSimpleLoop", mv -> {
             // for (int i = 0; i < 10; i++) { /* empty */ }
             // Bytecode:
@@ -209,7 +209,7 @@ class PrcRewriterTest {
 
     /** A method with nested loops gets entry + one poll per backedge. */
     @Test
-    void nestedLoops_allBackedgesInstrumented() {
+    void nestedLoopsAllBackedgesInstrumented() {
         byte[] original = buildFixtureClass("TestNestedLoops", mv -> {
             // for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { }
             mv.visitCode();
@@ -258,7 +258,7 @@ class PrcRewriterTest {
      * plus the entry poll — 3 polls total instead of 5.
      */
     @Test
-    void heartbeatPollEvery2_reducesBackedgePolls() {
+    void heartbeatPollEvery2ReducesBackedgePolls() {
         byte[] original = buildFixtureClass("TestHeartbeatPollEvery2", 2, mv -> {
             mv.visitCode();
             // 4 sequential loops — each contributes 1 backedge
@@ -292,7 +292,7 @@ class PrcRewriterTest {
 
     /** Methods without @Parallel annotation must not be modified. */
     @Test
-    void nonAnnotatedMethod_notModified() {
+    void nonAnnotatedMethodNotModified() {
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
         cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, "TestNoAnnotation", null,
                 "java/lang/Object", null);
@@ -311,7 +311,7 @@ class PrcRewriterTest {
 
     /** Rewritten bytes survive exception-table preservation check (CheckClassAdapter). */
     @Test
-    void tryCatchInLoop_verifies() {
+    void tryCatchInLoopVerifies() {
         byte[] original = buildFixtureClass("TestTryCatch", mv -> {
             mv.visitCode();
             org.objectweb.asm.Label loopStart = new org.objectweb.asm.Label();

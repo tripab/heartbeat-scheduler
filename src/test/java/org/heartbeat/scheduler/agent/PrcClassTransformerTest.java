@@ -25,7 +25,7 @@ class PrcClassTransformerTest {
     // =========================================================================
 
     @Test
-    void nullClassName_returnsNull() {
+    void nullClassNameReturnsNull() {
         assertThat(transformer.transform(null, null, null, null, new byte[]{0})).isNull();
     }
 
@@ -39,7 +39,7 @@ class PrcClassTransformerTest {
             "org/objectweb/asm/ClassWriter",
             "org/heartbeat/scheduler/agent/PrcRewriter",
     })
-    void skippedPrefixes_returnNull(String className) {
+    void skippedPrefixesReturnNull(String className) {
         byte[] result = transformer.transform(
                 null, className, null, null, new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
         assertThat(result)
@@ -56,7 +56,7 @@ class PrcClassTransformerTest {
      * the exception and return null rather than letting it propagate to the JVM.
      */
     @Test
-    void malformedBytes_caughtAndReturnsNull() {
+    void malformedBytesCaughtAndReturnsNull() {
         assertThatCode(() -> {
             byte[] result = transformer.transform(
                     null, "com/example/Foo", null, null, new byte[]{0, 1, 2, 3});
@@ -74,7 +74,7 @@ class PrcClassTransformerTest {
      * to signal "no transformation" rather than returning the original bytes.
      */
     @Test
-    void nonAnnotatedClass_returnsNull() throws Exception {
+    void nonAnnotatedClassReturnsNull() throws Exception {
         // HeartbeatConfig is outside the agent skip prefix and has no @Parallel annotation.
         byte[] bytes = bytesOf(HeartbeatConfig.class);
         byte[] result = transformer.transform(
@@ -91,7 +91,7 @@ class PrcClassTransformerTest {
      * rewritten bytes (non-null, different from the original buffer).
      */
     @Test
-    void annotatedClass_returnsInstrumentedBytes() {
+    void annotatedClassReturnsInstrumentedBytes() {
         byte[] original = buildAnnotatedFixture("com/example/Annotated");
         byte[] result = transformer.transform(
                 null, "com/example/Annotated", null, null, original);

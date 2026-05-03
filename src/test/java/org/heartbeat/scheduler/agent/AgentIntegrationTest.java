@@ -48,10 +48,11 @@ class AgentIntegrationTest {
 
     @Test
     void checkHeartbeatStaticWithContextDelegatesToCheckHeartbeat() {
-        // aggressiveBuilder() gives a machine-calibrated period of max(2τ, 2ns) which is
-        // guaranteed to be elapsed before the first check. CountBasedPolling.every(1)
-        // ensures shouldPoll() is true on the first invocation.
-        HeartbeatConfig config = TestConfig.aggressiveBuilder().build();
+        // instantFireBuilder() uses period=2ns / cost=1ns — the minimum valid pair.
+        // Any JVM operation takes far longer than 2ns, so the timer is already
+        // elapsed before the first shouldPromote() call.
+        // CountBasedPolling.every(1) ensures shouldPoll() is true on the first call.
+        HeartbeatConfig config = TestConfig.instantFireBuilder().build();
         HeartbeatContext ctx = new HeartbeatContext(config, CountBasedPolling.every(1));
         HeartbeatContext.setCurrent(ctx);
         try {
