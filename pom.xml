@@ -95,6 +95,7 @@
                     <argLine>
                         --add-exports java.base/jdk.internal.vm=ALL-UNNAMED
                     </argLine>
+                    <forkedProcessTimeoutInSeconds>120</forkedProcessTimeoutInSeconds>
                 </configuration>
             </plugin>
 
