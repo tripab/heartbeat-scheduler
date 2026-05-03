@@ -156,11 +156,6 @@ def plot(data: dict, out_path: str) -> None:
     promotions = data["promotions"]
     join_blocked = data["join_blocked"]
 
-    if not promotions and not join_blocked:
-        print("WARNING: No heartbeat events found in the recording.", file=sys.stderr)
-        print("  Make sure you recorded with the heartbeat scheduler running.", file=sys.stderr)
-        print("  Generating an empty placeholder chart.", file=sys.stderr)
-
     # --- normalise timestamps to milliseconds from first event ---
     all_times = [e["startTime"] for e in promotions + join_blocked]
     t0 = min(all_times) if all_times else 0.0
@@ -254,6 +249,10 @@ def main():
     print(f"  Total events in recording: {len(events)}")
 
     data = extract_heartbeat_events(events)
+    if not any(data.values()):
+        print("ERROR: No heartbeat events found in the recording.", file=sys.stderr)
+        print("  Make sure you recorded with the heartbeat scheduler running.", file=sys.stderr)
+        sys.exit(1)
     plot(data, args.out)
 
 
