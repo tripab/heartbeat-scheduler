@@ -27,17 +27,7 @@ public class PrcClassTransformer implements ClassFileTransformer {
             ProtectionDomain protectionDomain,
             byte[] classfileBuffer) {
 
-        // Skip JDK internals and the agent itself to avoid infinite recursion / JVM instability.
-        if (className == null) return null;
-        if (className.startsWith("java/")
-                || className.startsWith("javax/")
-                || className.startsWith("jdk/")
-                || className.startsWith("sun/")
-                || className.startsWith("com/sun/")
-                || className.startsWith("org/objectweb/asm/")
-                || className.startsWith("org/heartbeat/scheduler/agent/")) {
-            return null;
-        }
+        if (shouldSkip(loader, className)) return null;
 
         try {
             byte[] result = rewriter.rewrite(classfileBuffer, loader);
@@ -50,5 +40,18 @@ public class PrcClassTransformer implements ClassFileTransformer {
             System.err.println("[PrcAgent] Failed to instrument " + className + ": " + e);
             return null;
         }
+    }
+
+    private static boolean shouldSkip(ClassLoader loader, String className) {
+        // Skip bootstrap/platform classes and internal dependencies before parsing bytes.
+        if (loader == null || loader == ClassLoader.getPlatformClassLoader()) return true;
+        return className == null
+                || className.startsWith("java/")
+                || className.startsWith("javax/")
+                || className.startsWith("jdk/")
+                || className.startsWith("sun/")
+                || className.startsWith("com/sun/")
+                || className.startsWith("org/objectweb/asm/")
+                || className.startsWith("org/heartbeat/scheduler/agent/");
     }
 }

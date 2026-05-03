@@ -26,7 +26,9 @@ class PrcClassTransformerTest {
 
     @Test
     void nullClassNameReturnsNull() {
-        assertThat(transformer.transform(null, null, null, null, new byte[]{0})).isNull();
+        assertThat(transformer.transform(
+                ClassLoader.getSystemClassLoader(), null, null, null, new byte[]{0}))
+                .isNull();
     }
 
     @ParameterizedTest
@@ -41,9 +43,37 @@ class PrcClassTransformerTest {
     })
     void skippedPrefixesReturnNull(String className) {
         byte[] result = transformer.transform(
-                null, className, null, null, new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+                ClassLoader.getSystemClassLoader(),
+                className,
+                null,
+                null,
+                new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
         assertThat(result)
                 .as("transform should return null for skipped class '%s'", className)
+                .isNull();
+    }
+
+    @Test
+    void bootstrapLoaderReturnsNullBeforeParsing() {
+        byte[] result = transformer.transform(
+                null, "com/example/BootstrapAnnotated", null, null, buildAnnotatedFixture("com/example/BootstrapAnnotated"));
+
+        assertThat(result)
+                .as("bootstrap-loaded classes must be skipped")
+                .isNull();
+    }
+
+    @Test
+    void platformLoaderReturnsNullBeforeParsing() {
+        byte[] result = transformer.transform(
+                ClassLoader.getPlatformClassLoader(),
+                "com/example/PlatformAnnotated",
+                null,
+                null,
+                buildAnnotatedFixture("com/example/PlatformAnnotated"));
+
+        assertThat(result)
+                .as("platform-loaded classes must be skipped")
                 .isNull();
     }
 
@@ -59,7 +89,11 @@ class PrcClassTransformerTest {
     void malformedBytesCaughtAndReturnsNull() {
         assertThatCode(() -> {
             byte[] result = transformer.transform(
-                    null, "com/example/Foo", null, null, new byte[]{0, 1, 2, 3});
+                    ClassLoader.getSystemClassLoader(),
+                    "com/example/Foo",
+                    null,
+                    null,
+                    new byte[]{0, 1, 2, 3});
             assertThat(result).isNull();
         }).doesNotThrowAnyException();
     }
@@ -94,7 +128,7 @@ class PrcClassTransformerTest {
     void annotatedClassReturnsInstrumentedBytes() {
         byte[] original = buildAnnotatedFixture("com/example/Annotated");
         byte[] result = transformer.transform(
-                null, "com/example/Annotated", null, null, original);
+                ClassLoader.getSystemClassLoader(), "com/example/Annotated", null, null, original);
         assertThat(result)
                 .as("class with @Parallel must be transformed and returned non-null")
                 .isNotNull()
