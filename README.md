@@ -248,7 +248,6 @@ TimingCalibration.CalibrationResults cal = TimingCalibration.calibrate();
 HeartbeatConfig config = HeartbeatConfig.newBuilder()
     .heartbeatPeriodNanos(cal.recommendedHeartbeatPeriod())  // 20τ → ~5% overhead
     .promotionCostNanos(cal.promotionCost())                 // τ measured on this JVM
-    .numCarrierThreads(8)
     .enableStatistics(true)
     .build();
 
@@ -266,6 +265,10 @@ HeartbeatConfig config = HeartbeatConfig.newBuilder()
             cal.recommendedHeartbeatPeriod()))
     .build();
 ```
+
+Virtual-thread carrier count is controlled by Loom's JVM-global scheduler
+setting, not by `HeartbeatConfig`. Use `-Djdk.virtualThreadScheduler.parallelism=N`
+when launching a benchmark or example that needs a fixed carrier count.
 
 ---
 

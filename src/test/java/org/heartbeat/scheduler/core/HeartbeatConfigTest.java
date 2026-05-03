@@ -11,8 +11,6 @@ class HeartbeatConfigTest {
 
         assertThat(config.getHeartbeatPeriodNanos()).isEqualTo(30_000);
         assertThat(config.getPromotionCostNanos()).isEqualTo(1_500);
-        assertThat(config.getNumCarrierThreads())
-            .isEqualTo(Runtime.getRuntime().availableProcessors());
         assertThat(config.isStatisticsEnabled()).isFalse();
         assertThat(config.isDebugLoggingEnabled()).isFalse();
     }
@@ -22,14 +20,12 @@ class HeartbeatConfigTest {
         HeartbeatConfig config = HeartbeatConfig.newBuilder()
             .heartbeatPeriodNanos(50_000)
             .promotionCostNanos(2_500)
-            .numCarrierThreads(8)
             .enableStatistics(true)
             .enableDebugLogging(true)
             .build();
 
         assertThat(config.getHeartbeatPeriodNanos()).isEqualTo(50_000);
         assertThat(config.getPromotionCostNanos()).isEqualTo(2_500);
-        assertThat(config.getNumCarrierThreads()).isEqualTo(8);
         assertThat(config.isStatisticsEnabled()).isTrue();
         assertThat(config.isDebugLoggingEnabled()).isTrue();
     }
@@ -127,21 +123,6 @@ class HeartbeatConfigTest {
     }
 
     @Test
-    void testInvalidCarrierThreads() {
-        assertThatThrownBy(() -> 
-            HeartbeatConfig.newBuilder()
-                .numCarrierThreads(0)
-                .build()
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        assertThatThrownBy(() -> 
-            HeartbeatConfig.newBuilder()
-                .numCarrierThreads(-1)
-                .build()
-        ).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
     void testInvalidTargetOverhead() {
         assertThatThrownBy(() -> 
             HeartbeatConfig.newBuilder()
@@ -192,12 +173,11 @@ class HeartbeatConfigTest {
         HeartbeatConfig config = HeartbeatConfig.newBuilder()
             .heartbeatPeriodMicros(30)
             .promotionCostNanos(1500)
-            .numCarrierThreads(4)
             .build();
 
         String str = config.toString();
         assertThat(str).contains("30.00μs");
         assertThat(str).contains("1.50μs");
-        assertThat(str).contains("carriers=4");
+        assertThat(str).doesNotContain("carriers=");
     }
 }

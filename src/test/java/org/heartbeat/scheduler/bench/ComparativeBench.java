@@ -21,9 +21,9 @@ import java.util.concurrent.*;
  *   <li>ForkJoinPool — direct: {@code new ForkJoinPool(numCarriers)}.</li>
  *   <li>Heartbeat scheduler — indirect: Loom's default carrier scheduler is a ForkJoinPool
  *       sized to {@code jdk.virtualThreadScheduler.parallelism} (defaults to
- *       {@code Runtime.availableProcessors()}).  The heartbeat executor therefore
- *       uses whatever Loom offers; the {@code numCarriers} parameter still provides a
- *       meaningful experimental axis because the ForkJoinPool baseline is controlled.</li>
+ *       {@code Runtime.availableProcessors()}). The heartbeat executor uses that
+ *       JVM-global setting; the {@code numCarriers} parameter controls only the
+ *       direct ForkJoinPool baseline in this in-process benchmark.</li>
  *   <li>Sequential — single-threaded reference; same result regardless of {@code numCarriers}.</li>
  * </ul>
  *
@@ -51,7 +51,6 @@ public class ComparativeBench extends AbstractHeartbeatBench {
                 HeartbeatConfig.newBuilder()
                         .heartbeatPeriodNanos(CALIBRATION.recommendedHeartbeatPeriod())
                         .promotionCostNanos(CALIBRATION.promotionCost())
-                        .numCarrierThreads(numCarriers)
                         .build());
         fjPool = new ForkJoinPool(numCarriers);
     }

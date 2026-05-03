@@ -15,7 +15,6 @@ import java.util.function.Supplier;
 public class HeartbeatConfig {
     private final long heartbeatPeriodNanos;
     private final long promotionCostNanos;
-    private final int numCarrierThreads;
     private final boolean enableStatistics;
     private final boolean enableDebugLogging;
     private final Supplier<PollingStrategy> pollingStrategyFactory;
@@ -24,7 +23,6 @@ public class HeartbeatConfig {
     private HeartbeatConfig(Builder builder) {
         this.heartbeatPeriodNanos = builder.heartbeatPeriodNanos;
         this.promotionCostNanos = builder.promotionCostNanos;
-        this.numCarrierThreads = builder.numCarrierThreads;
         this.enableStatistics = builder.enableStatistics;
         this.enableDebugLogging = builder.enableDebugLogging;
         this.pollingStrategyFactory = builder.pollingStrategyFactory;
@@ -37,10 +35,6 @@ public class HeartbeatConfig {
 
     public long getPromotionCostNanos() {
         return promotionCostNanos;
-    }
-
-    public int getNumCarrierThreads() {
-        return numCarrierThreads;
     }
 
     public boolean isStatisticsEnabled() {
@@ -90,11 +84,10 @@ public class HeartbeatConfig {
     @Override
     public String toString() {
         return String.format(
-            "HeartbeatConfig[period=%.2fμs, cost=%.2fμs, carriers=%d, " +
+            "HeartbeatConfig[period=%.2fμs, cost=%.2fμs, " +
             "overhead=%.2f%%, spanIncrease=%.2fx, stats=%s]",
             heartbeatPeriodNanos / 1000.0,
             promotionCostNanos / 1000.0,
-            numCarrierThreads,
             getExpectedOverheadPercentage(),
             getSpanIncreaseFactor(),
             enableStatistics
@@ -110,9 +103,6 @@ public class HeartbeatConfig {
         
         // Default: 1.5μs promotion cost (typical for virtual threads)
         private long promotionCostNanos = 1_500;
-        
-        // Default: one carrier thread per processor
-        private int numCarrierThreads = Runtime.getRuntime().availableProcessors();
         
         private boolean enableStatistics = false;
         private boolean enableDebugLogging = false;
@@ -176,17 +166,6 @@ public class HeartbeatConfig {
                 );
             }
             this.targetOverheadPercent = percent;
-            return this;
-        }
-
-        /**
-         * Set number of carrier (platform) threads.
-         */
-        public Builder numCarrierThreads(int count) {
-            if (count <= 0) {
-                throw new IllegalArgumentException("Number of carriers must be positive");
-            }
-            this.numCarrierThreads = count;
             return this;
         }
 
