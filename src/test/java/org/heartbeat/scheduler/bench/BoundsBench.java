@@ -3,13 +3,11 @@ package org.heartbeat.scheduler.bench;
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.core.TimeBasedPolling;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
-import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.heartbeat.scheduler.utils.TimingCalibration;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * JMH benchmark: empirical verification of the (1 + τ/N) work-overhead bound.
@@ -35,13 +33,7 @@ import java.util.concurrent.TimeUnit;
  *     -Dexec.args="BoundsBench -rf json -rff docs/results/bounds.json"
  * </pre>
  */
-@State(Scope.Benchmark)
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 5, time = 2)
-@Measurement(iterations = 10, time = 2)
-@Fork(value = 3, jvmArgsPrepend = "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED")
-public class BoundsBench {
+public class BoundsBench extends AbstractHeartbeatBench {
 
     /**
      * N/τ ratio: heartbeat period expressed as a multiple of the promotion cost.
@@ -53,14 +45,11 @@ public class BoundsBench {
 
     private static final int FIB_N = 30;
 
-    private VirtualThreadExecutor executor;
-    private long measuredTauNanos;
-
     @Setup(Level.Trial)
     public void setup() {
         // Measure τ — virtual-thread creation + scheduling latency.
         // Guard against implausibly small values on misconfigured systems.
-        measuredTauNanos = TimingCalibration.estimateVirtualThreadCost();
+        long measuredTauNanos = TimingCalibration.estimateVirtualThreadCost();
         if (measuredTauNanos < 500) measuredTauNanos = 2_000;
 
         long heartbeatPeriodNanos = measuredTauNanos * ratioNoverTau;
@@ -76,45 +65,15 @@ public class BoundsBench {
                         .build());
     }
 
-    @TearDown(Level.Trial)
-    public void tearDown() {
-        executor.close();
-    }
-
     /** Heartbeat-scheduled recursive Fibonacci. */
     @Benchmark
     public void heartbeat(Blackhole bh) throws ExecutionException {
-        bh.consume(executor.submit(new FibTask(FIB_N)));
+        bh.consume(executor.submit(new Tasks.FibTask(FIB_N)));
     }
 
     /** Sequential baseline — same computation with zero scheduling overhead. */
     @Benchmark
     public void sequential(Blackhole bh) {
-        bh.consume(seqFib(FIB_N));
-    }
-
-    // ---- heartbeat task ------------------------------------------------
-
-    static final class FibTask extends HeartbeatTask<Long> {
-        private final int n;
-
-        FibTask(int n) { this.n = n; }
-
-        @Override
-        protected Long compute() {
-            if (n <= 1) return (long) n;
-            FibTask f1 = new FibTask(n - 1);
-            FibTask f2 = new FibTask(n - 2);
-            fork(f1);
-            fork(f2);
-            return join(f1) + join(f2);
-        }
-    }
-
-    // ---- sequential reference ------------------------------------------
-
-    static long seqFib(int n) {
-        if (n <= 1) return n;
-        return seqFib(n - 1) + seqFib(n - 2);
+        bh.consume(Tasks.seqFib(FIB_N));
     }
 }

@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.bench;
 
-import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.openjdk.jmh.annotations.*;
@@ -20,13 +19,7 @@ import java.util.concurrent.*;
  * {@code THRESHOLD} rows remain, at which point the sequential dot-product
  * loop runs. Both halves are forked, giving a balanced binary tree.
  */
-@State(Scope.Benchmark)
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 5, time = 2)
-@Measurement(iterations = 10, time = 2)
-@Fork(value = 3, jvmArgsPrepend = "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED")
-public class MatmulBench {
+public class MatmulBench extends AbstractHeartbeatBench {
 
     @Param({"64", "128", "256"})
     public int n;
@@ -35,23 +28,13 @@ public class MatmulBench {
 
     private double[][] a;
     private double[][] b;
-    private VirtualThreadExecutor executor;
 
     @Setup(Level.Trial)
     public void setup() {
         Random rng = new Random(42);
         a = randomMatrix(n, rng);
         b = randomMatrix(n, rng);
-        executor = new VirtualThreadExecutor(
-                HeartbeatConfig.newBuilder()
-                        .heartbeatPeriodMicros(30)
-                        .promotionCostMicros(2)
-                        .build());
-    }
-
-    @TearDown(Level.Trial)
-    public void tearDown() {
-        executor.close();
+        executor = new VirtualThreadExecutor(defaultConfig());
     }
 
     @Benchmark
@@ -77,7 +60,7 @@ public class MatmulBench {
 
     // ---- heartbeat task ------------------------------------------------
 
-    final class MmTask extends HeartbeatTask<Void> {
+    static final class MmTask extends HeartbeatTask<Void> {
         private final double[][] a, b, c;
         private final int lo, hi;
 
@@ -93,7 +76,7 @@ public class MatmulBench {
                 return null;
             }
             int mid = (lo + hi) / 2;
-            MmTask left = new MmTask(a, b, c, lo, mid);
+            MmTask left  = new MmTask(a, b, c, lo, mid);
             MmTask right = new MmTask(a, b, c, mid, hi);
             fork(left);
             fork(right);
@@ -105,7 +88,7 @@ public class MatmulBench {
 
     // ---- ForkJoinPool task ---------------------------------------------
 
-    final class FjMm extends RecursiveAction {
+    static final class FjMm extends RecursiveAction {
         private final double[][] a, b, c;
         private final int lo, hi;
 
@@ -121,7 +104,7 @@ public class MatmulBench {
                 return;
             }
             int mid = (lo + hi) / 2;
-            FjMm left = new FjMm(a, b, c, lo, mid);
+            FjMm left  = new FjMm(a, b, c, lo, mid);
             FjMm right = new FjMm(a, b, c, mid, hi);
             left.fork();
             right.compute();

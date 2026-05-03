@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.bench;
 
-import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.openjdk.jmh.annotations.*;
@@ -19,13 +18,7 @@ import java.util.concurrent.*;
  * <p>Each benchmark method receives a fresh copy of the input so array state
  * does not carry over between invocations.
  */
-@State(Scope.Benchmark)
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 5, time = 2)
-@Measurement(iterations = 10, time = 2)
-@Fork(value = 3, jvmArgsPrepend = "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED")
-public class QuicksortBench {
+public class QuicksortBench extends AbstractHeartbeatBench {
 
     @Param({"100000", "500000"})
     public int size;
@@ -34,24 +27,13 @@ public class QuicksortBench {
     private static final int THRESHOLD = 1000;
 
     private int[] sourceData;
-    private VirtualThreadExecutor executor;
 
     @Setup(Level.Trial)
     public void setup() {
         Random rng = new Random(42);
         sourceData = new int[size];
         for (int i = 0; i < size; i++) sourceData[i] = rng.nextInt();
-
-        executor = new VirtualThreadExecutor(
-                HeartbeatConfig.newBuilder()
-                        .heartbeatPeriodMicros(30)
-                        .promotionCostMicros(2)
-                        .build());
-    }
-
-    @TearDown(Level.Trial)
-    public void tearDown() {
-        executor.close();
+        executor = new VirtualThreadExecutor(defaultConfig());
     }
 
     @Benchmark

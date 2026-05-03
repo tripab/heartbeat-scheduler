@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.bench;
 
-import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.openjdk.jmh.annotations.*;
@@ -22,13 +21,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
  * <p>Graph: {@code numNodes} nodes, each with exactly {@code AVG_DEGREE} randomly
  * chosen out-edges (a Erdős–Rényi-style construction with fixed seed).
  */
-@State(Scope.Benchmark)
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 5, time = 2)
-@Measurement(iterations = 10, time = 2)
-@Fork(value = 3, jvmArgsPrepend = "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED")
-public class BfsBench {
+public class BfsBench extends AbstractHeartbeatBench {
 
     @Param({"10000", "50000"})
     public int numNodes;
@@ -38,7 +31,6 @@ public class BfsBench {
 
     /** Adjacency list representation. */
     private int[][] adj;
-    private VirtualThreadExecutor executor;
 
     @Setup(Level.Trial)
     public void setup() {
@@ -50,16 +42,7 @@ public class BfsBench {
                 adj[i][d] = rng.nextInt(numNodes);
             }
         }
-        executor = new VirtualThreadExecutor(
-                HeartbeatConfig.newBuilder()
-                        .heartbeatPeriodMicros(30)
-                        .promotionCostMicros(2)
-                        .build());
-    }
-
-    @TearDown(Level.Trial)
-    public void tearDown() {
-        executor.close();
+        executor = new VirtualThreadExecutor(defaultConfig());
     }
 
     @Benchmark
@@ -91,7 +74,6 @@ public class BfsBench {
             executor.submit(new FrontierTask(frontier, 0, frontier.length,
                     adj, visited, nextQueue));
 
-            // Drain next frontier
             int[] next = new int[nextQueue.size()];
             int idx = 0;
             for (int node : nextQueue) next[idx++] = node;
@@ -132,10 +114,8 @@ public class BfsBench {
                 return null;
             }
             int mid = (lo + hi) / 2;
-            FrontierTask left = new FrontierTask(
-                    frontier, lo, mid, adj, visited, nextFrontier);
-            FrontierTask right = new FrontierTask(
-                    frontier, mid, hi, adj, visited, nextFrontier);
+            FrontierTask left  = new FrontierTask(frontier, lo,  mid, adj, visited, nextFrontier);
+            FrontierTask right = new FrontierTask(frontier, mid, hi,  adj, visited, nextFrontier);
             fork(left);
             fork(right);
             join(left);
@@ -198,10 +178,8 @@ public class BfsBench {
                 return;
             }
             int mid = (lo + hi) / 2;
-            FjFrontier left = new FjFrontier(
-                    frontier, lo, mid, adj, visited, nextFrontier);
-            FjFrontier right = new FjFrontier(
-                    frontier, mid, hi, adj, visited, nextFrontier);
+            FjFrontier left  = new FjFrontier(frontier, lo,  mid, adj, visited, nextFrontier);
+            FjFrontier right = new FjFrontier(frontier, mid, hi,  adj, visited, nextFrontier);
             left.fork();
             right.compute();
             left.join();
