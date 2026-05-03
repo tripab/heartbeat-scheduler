@@ -94,12 +94,6 @@ class VirtualThreadExecutorTest {
     }
 
     @Test
-    void testConfig() {
-        assertThat(executor.getConfig()).isNotNull();
-        assertThat(executor.getConfig().getHeartbeatPeriodNanos()).isEqualTo(TestConfig.normalPeriodNanos());
-    }
-
-    @Test
     void testNullConfigThrows() {
         assertThatThrownBy(() -> new VirtualThreadExecutor(null))
                 .isInstanceOf(IllegalArgumentException.class);

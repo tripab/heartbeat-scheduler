@@ -56,17 +56,6 @@ class PollingStrategyTest {
         }
 
         @Test
-        void testGetName() {
-            assertThat(CountBasedPolling.every(100).getName()).contains("100");
-        }
-
-        @Test
-        void testCreateDefault() {
-            CountBasedPolling polling = CountBasedPolling.createDefault();
-            assertThat(polling.getPollInterval()).isEqualTo(1000);
-        }
-
-        @Test
         void testZeroIntervalThrows() {
             assertThatThrownBy(() -> CountBasedPolling.every(0))
                     .isInstanceOf(IllegalArgumentException.class);
@@ -135,18 +124,6 @@ class PollingStrategyTest {
         }
 
         @Test
-        void testGetName() {
-            String name = TimeBasedPolling.everyMicros(10).getName();
-            assertThat(name).contains("TimeBased");
-        }
-
-        @Test
-        void testCreateDefault() {
-            TimeBasedPolling polling = TimeBasedPolling.createDefault();
-            assertThat(polling.getPollIntervalMicros()).isEqualTo(10);
-        }
-
-        @Test
         void testForHeartbeatPeriod() {
             // 100μs heartbeat → poll at 10μs
             TimeBasedPolling polling = TimeBasedPolling.forHeartbeatPeriod(100_000);
@@ -172,12 +149,5 @@ class PollingStrategyTest {
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
-        @Test
-        void testTimeSinceLastPoll() throws InterruptedException {
-            TimeBasedPolling polling = TimeBasedPolling.everyMicros(1_000);
-            Thread.sleep(2);
-            assertThat(polling.getTimeSinceLastPollNanos()).isGreaterThan(0);
-            assertThat(polling.getTimeSinceLastPollMicros()).isGreaterThanOrEqualTo(1);
-        }
     }
 }

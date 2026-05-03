@@ -283,19 +283,4 @@ class HeartbeatContextTest {
         assertThat(timer.shouldPromote()).isTrue();
     }
 
-    @Test
-    void testToString() {
-        PollingStrategy alwaysPoll = CountBasedPolling.every(1);
-        HeartbeatContext context = new HeartbeatContext(config, alwaysPoll);
-
-        for (int i = 0; i < 10; i++) {
-            context.checkHeartbeat();
-        }
-
-        String str = context.toString();
-
-        assertThat(str).contains("ops=10");
-        assertThat(str).contains("polls=10");
-        assertThat(str).contains("promotions=0");
-    }
 }

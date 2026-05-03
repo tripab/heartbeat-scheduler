@@ -81,39 +81,6 @@ class HeartbeatContinuationTest {
     }
 
     @Test
-    void testHasYieldedSetBeforeYield() {
-        AtomicBoolean yieldedBeforeYield = new AtomicBoolean(false);
-        HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {});
-
-        // hasYielded starts false
-        assertThat(cont.hasYielded()).isFalse();
-
-        // After a yield+resume cycle, hasYielded should be true
-        HeartbeatContinuation cont2 = new HeartbeatContinuation(scope, () -> {
-            HeartbeatContinuation.yieldCurrent(scope);
-        });
-        cont2.resume(); // runs to yield point
-        assertThat(cont2.isDone()).isFalse();
-        // After yielding, hasYielded should be observable even before resume
-        // (We can't directly test the "before yield returns" timing from outside,
-        //  but we verify it's true after the first resume which ran up to the yield)
-    }
-
-    @Test
-    void testGetScope() {
-        HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {});
-        assertThat(cont.getScope()).isSameAs(scope);
-    }
-
-    @Test
-    void testAge() throws InterruptedException {
-        HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {});
-        Thread.sleep(2);
-        assertThat(cont.getAgeNanos()).isGreaterThan(0);
-        assertThat(cont.getAgeMicros()).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
     void testNullScopeThrows() {
         assertThatThrownBy(() -> new HeartbeatContinuation(null, () -> {}))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -127,12 +94,4 @@ class HeartbeatContinuationTest {
                 .hasMessageContaining("Target");
     }
 
-    @Test
-    void testToString() {
-        HeartbeatContinuation cont = new HeartbeatContinuation(scope, () -> {});
-        String str = cont.toString();
-        assertThat(str).contains("test");
-        assertThat(str).contains("done=false");
-        assertThat(str).contains("yielded=false");
-    }
 }

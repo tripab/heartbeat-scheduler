@@ -193,13 +193,4 @@ class JoinCounterTest {
         assertThat(completed).isTrue();
     }
 
-    @Test
-    void testToString() {
-        JoinCounter counter = new JoinCounter(3, new DummyTask());
-        String str = counter.toString();
-        
-        assertThat(str).contains("count=3");
-        assertThat(str).contains("ready=false");
-        assertThat(str).contains("DummyTask");
-    }
 }

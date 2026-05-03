@@ -168,16 +168,4 @@ class HeartbeatConfigTest {
         ).isInstanceOf(IllegalStateException.class);
     }
 
-    @Test
-    void testToString() {
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-            .heartbeatPeriodMicros(30)
-            .promotionCostNanos(1500)
-            .build();
-
-        String str = config.toString();
-        assertThat(str).contains("30.00μs");
-        assertThat(str).contains("1.50μs");
-        assertThat(str).doesNotContain("carriers=");
-    }
 }

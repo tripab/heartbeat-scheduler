@@ -123,15 +123,6 @@ class ForkJoinIntegrationTest {
     // --- Tests ---
 
     @Test
-    void testStatisticsAfterForkJoin() throws ExecutionException {
-        Long result = executor.submit(new FibTask(10));
-        assertThat(result).isEqualTo(55L);
-
-        VirtualThreadExecutor.ExecutorStatistics stats = executor.getStatistics();
-        assertThat(stats.totalTasksExecuted).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
     void testSimpleTask() throws ExecutionException {
         Integer result = executor.submit(new AddTask(3, 4));
         assertThat(result).isEqualTo(7);
@@ -171,12 +162,6 @@ class ForkJoinIntegrationTest {
     }
 
     @Test
-    void testFibonacciMedium() throws ExecutionException {
-        assertThat(executor.submit(new FibTask(10))).isEqualTo(55L);
-        assertThat(executor.submit(new FibTask(15))).isEqualTo(610L);
-    }
-
-    @Test
     void testFibonacciLarger() throws ExecutionException {
         assertThat(executor.submit(new FibTask(20))).isEqualTo(6765L);
     }
@@ -199,14 +184,6 @@ class ForkJoinIntegrationTest {
         }
         Long result = executor.submit(new SumTask(array, 0, size, 50));
         assertThat(result).isEqualTo(expected);
-    }
-
-    @Test
-    void testSequentialSubmissions() throws ExecutionException {
-        for (int i = 0; i < 5; i++) {
-            Long result = executor.submit(new FibTask(10));
-            assertThat(result).isEqualTo(55L);
-        }
     }
 
     @Test

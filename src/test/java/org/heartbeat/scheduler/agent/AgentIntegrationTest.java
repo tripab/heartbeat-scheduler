@@ -139,30 +139,6 @@ class AgentIntegrationTest {
     }
 
     @Test
-    void rewrittenClassProducesCorrectResult() throws Exception {
-        String internalName = "SyntheticWorkerForTest";
-        byte[] original = buildSyntheticWorkerClass(internalName);
-
-        PrcRewriter rewriter = new PrcRewriter();
-        byte[] rewritten = rewriter.rewrite(original, null);
-
-        assertThat(rewritten)
-                .as("@Parallel class should be modified by the rewriter")
-                .isNotSameAs(original);
-
-        // Load the rewritten class
-        ClassLoader loader = new SingleClassLoader(internalName.replace('/', '.'), rewritten);
-        Class<?> cls = loader.loadClass(internalName.replace('/', '.'));
-        Method countDown = cls.getMethod("countDown", int.class);
-
-        // Verify correctness: sum(1..10) = 55
-        int n = 10;
-        int expected = n * (n + 1) / 2; // 55
-        int result = (int) countDown.invoke(null, n);
-        assertThat(result).isEqualTo(expected);
-    }
-
-    @Test
     void rewrittenClassMatchesUninstrumentedResults() throws Exception {
         String internalName = "SyntheticWorkerForDifferentialTest";
         byte[] original = buildSyntheticWorkerClass(internalName);

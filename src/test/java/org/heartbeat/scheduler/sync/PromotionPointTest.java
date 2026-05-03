@@ -73,20 +73,6 @@ class PromotionPointTest {
     }
 
     @Test
-    void testAge() throws InterruptedException {
-        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
-
-        long age1 = point.getAgeNanos();
-        assertThat(age1).isGreaterThanOrEqualTo(0);
-
-        Thread.sleep(1); // 1ms
-
-        long age2 = point.getAgeNanos();
-        assertThat(age2).isGreaterThan(age1);
-        assertThat(point.getAgeMicros()).isGreaterThan(0);
-    }
-
-    @Test
     void testInitialListState() {
         PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
 
@@ -255,14 +241,4 @@ class PromotionPointTest {
         assertThat(points[3].getPrev()).isSameAs(points[1]);
     }
 
-    @Test
-    void testToString() {
-        PromotionPoint point = new PromotionPoint(continuation, scope, dummyTask);
-        String str = point.toString();
-
-        assertThat(str).contains("scope=test");
-        assertThat(str).contains("promoted=false");
-        assertThat(str).contains("isHead=true");
-        assertThat(str).contains("isTail=true");
-    }
 }

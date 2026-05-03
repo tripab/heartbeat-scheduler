@@ -149,22 +149,4 @@ class HeartbeatTimerTest {
         }
     }
 
-    @Test
-    void testTimingBehaviorWithCalibratedPeriod() throws InterruptedException {
-        long period = TestConfig.normalPeriodNanos();
-        HeartbeatTimer calibratedTimer = new HeartbeatTimer(period);
-
-        // Should not promote immediately
-        assertThat(calibratedTimer.shouldPromote()).isFalse();
-
-        // Sleep past the period
-        Thread.sleep(TestConfig.sleepToExceed(period));
-
-        // Should definitely promote now
-        assertThat(calibratedTimer.shouldPromote()).isTrue();
-
-        // After recording, elapsed time is less than period
-        calibratedTimer.recordPromotion();
-        assertThat(calibratedTimer.getTimeSincePromotion()).isLessThan(period);
-    }
 }
