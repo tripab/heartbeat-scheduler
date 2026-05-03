@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.examples;
 
-import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
@@ -25,17 +24,13 @@ public final class FibonacciExample {
     private FibonacciExample() {}
 
     public static void main(String[] args) throws ExecutionException {
-        int n = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_N;
+        int n = ExamplesSupport.intArg(args, 0, DEFAULT_N);
         if (n < 0 || n > MAX_N) {
             System.err.printf("Pick n in [0, %d]; got %d%n", MAX_N, n);
             System.exit(1);
         }
 
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodMicros(30)
-                .promotionCostMicros(2)
-                .enableStatistics(true)
-                .build();
+        var config = ExamplesSupport.defaultHeartbeatConfig();
 
         System.out.println(config);
         System.out.printf("Computing fib(%d) with heartbeat scheduling...%n", n);
@@ -46,7 +41,7 @@ public final class FibonacciExample {
             long elapsedNanos = System.nanoTime() - start;
 
             System.out.printf("fib(%d) = %d%n", n, result);
-            System.out.printf("Elapsed: %.2f ms%n", elapsedNanos / 1_000_000.0);
+            System.out.printf("Elapsed: %.2f ms%n", ExamplesSupport.millis(elapsedNanos));
             System.out.println(executor.getStatistics());
         }
     }

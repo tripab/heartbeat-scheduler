@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.examples;
 
-import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
@@ -30,26 +29,13 @@ public final class ParallelSumExample {
     private static final int DEFAULT_SIZE = 1_000_000;
     private static final int DEFAULT_THRESHOLD = 10_000;
     // 100 multiply-add steps per element makes leaf work CPU-bound.
-    private static final int WORK_STEPS = 100;
+    private static final int WORK_STEPS = ExamplesSupport.WORK_STEPS;
 
     private ParallelSumExample() {}
 
-    /**
-     * Deterministic per-element work kernel. Runs {@link #WORK_STEPS}
-     * iterations of a linear congruential generator seeded from {@code x}.
-     * The result depends on every step so the compiler cannot eliminate work.
-     */
-    static long work(int x) {
-        long v = x;
-        for (int k = 0; k < WORK_STEPS; k++) {
-            v = v * 6364136223846793005L + 1442695040888963407L;
-        }
-        return v;
-    }
-
     public static void main(String[] args) throws ExecutionException {
-        int size = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_SIZE;
-        int threshold = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_THRESHOLD;
+        int size = ExamplesSupport.intArg(args, 0, DEFAULT_SIZE);
+        int threshold = ExamplesSupport.intArg(args, 1, DEFAULT_THRESHOLD);
         if (size <= 0 || threshold <= 0 || threshold > size) {
             System.err.printf("Need size > 0 and 0 < threshold <= size; got size=%d threshold=%d%n",
                     size, threshold);
@@ -61,17 +47,10 @@ public final class ParallelSumExample {
 
         // Sequential baseline — establishes the correct expected result.
         long seqStart = System.nanoTime();
-        long seqResult = 0;
-        for (int i = 0; i < size; i++) {
-            seqResult += work(i);
-        }
+        long seqResult = ExamplesSupport.rangeSum(0, size);
         long seqElapsed = System.nanoTime() - seqStart;
 
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodMicros(30)
-                .promotionCostMicros(2)
-                .enableStatistics(true)
-                .build();
+        var config = ExamplesSupport.defaultHeartbeatConfig();
         System.out.println(config);
 
         try (VirtualThreadExecutor executor = new VirtualThreadExecutor(config)) {
@@ -85,9 +64,9 @@ public final class ParallelSumExample {
                 System.exit(2);
             }
 
-            System.out.printf("Sequential:  %.2f ms%n", seqElapsed / 1_000_000.0);
+            System.out.printf("Sequential:  %.2f ms%n", ExamplesSupport.millis(seqElapsed));
             System.out.printf("Heartbeat:   %.2f ms (promotions add overhead until Phase R2)%n",
-                    parElapsed / 1_000_000.0);
+                    ExamplesSupport.millis(parElapsed));
             System.out.printf("Result:      %d (correct)%n", parResult);
             System.out.println(executor.getStatistics());
         }
@@ -107,9 +86,7 @@ public final class ParallelSumExample {
         @Override
         protected Long compute() {
             if (end - start <= threshold) {
-                long sum = 0;
-                for (int i = start; i < end; i++) sum += work(i);
-                return sum;
+                return ExamplesSupport.rangeSum(start, end);
             }
             int mid = (start + end) / 2;
             ReductionTask left = new ReductionTask(start, mid, threshold);

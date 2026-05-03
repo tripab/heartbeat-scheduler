@@ -1,6 +1,5 @@
 package org.heartbeat.scheduler.examples;
 
-import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 
@@ -31,25 +30,16 @@ public final class RecursiveSumExample {
 
     private static final int DEFAULT_SIZE = 1_000_000;
     private static final int DEFAULT_THRESHOLD = 10_000;
-    private static final int WORK_STEPS = 100; // same kernel as ParallelSumExample
+    private static final int WORK_STEPS = ExamplesSupport.WORK_STEPS;
     // Skew factor: left chunk = SPLIT_PCT% of range, right = rest.
     private static final int SPLIT_NUMERATOR = 1;
     private static final int SPLIT_DENOMINATOR = 10; // 1/10 = 10%
 
     private RecursiveSumExample() {}
 
-    /** Same LCG kernel as {@link ParallelSumExample} — results are comparable. */
-    static long work(int x) {
-        long v = x;
-        for (int k = 0; k < WORK_STEPS; k++) {
-            v = v * 6364136223846793005L + 1442695040888963407L;
-        }
-        return v;
-    }
-
     public static void main(String[] args) throws ExecutionException {
-        int size = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_SIZE;
-        int threshold = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_THRESHOLD;
+        int size = ExamplesSupport.intArg(args, 0, DEFAULT_SIZE);
+        int threshold = ExamplesSupport.intArg(args, 1, DEFAULT_THRESHOLD);
         if (size <= 0 || threshold <= 0 || threshold > size) {
             System.err.printf("Need size > 0 and 0 < threshold <= size; got size=%d threshold=%d%n",
                     size, threshold);
@@ -65,17 +55,10 @@ public final class RecursiveSumExample {
 
         // Sequential baseline
         long seqStart = System.nanoTime();
-        long seqResult = 0;
-        for (int i = 0; i < size; i++) {
-            seqResult += work(i);
-        }
+        long seqResult = ExamplesSupport.rangeSum(0, size);
         long seqElapsed = System.nanoTime() - seqStart;
 
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodMicros(30)
-                .promotionCostMicros(2)
-                .enableStatistics(true)
-                .build();
+        var config = ExamplesSupport.defaultHeartbeatConfig();
         System.out.println(config);
 
         try (VirtualThreadExecutor executor = new VirtualThreadExecutor(config)) {
@@ -89,8 +72,8 @@ public final class RecursiveSumExample {
                 System.exit(2);
             }
 
-            System.out.printf("Sequential:  %.2f ms%n", seqElapsed / 1_000_000.0);
-            System.out.printf("Skewed:      %.2f ms%n", parElapsed / 1_000_000.0);
+            System.out.printf("Sequential:  %.2f ms%n", ExamplesSupport.millis(seqElapsed));
+            System.out.printf("Skewed:      %.2f ms%n", ExamplesSupport.millis(parElapsed));
             System.out.printf("Result:      %d (correct)%n", parResult);
             System.out.println(executor.getStatistics());
         }
@@ -117,9 +100,7 @@ public final class RecursiveSumExample {
         @Override
         protected Long compute() {
             if (end - start <= threshold) {
-                long sum = 0;
-                for (int i = start; i < end; i++) sum += work(i);
-                return sum;
+                return ExamplesSupport.rangeSum(start, end);
             }
             // Peel off a small left chunk; recurse on the large right remainder.
             int mid = Math.min(start + splitSize, end - threshold);
