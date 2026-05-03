@@ -71,6 +71,14 @@ java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
      -cp target/classes \
      org.heartbeat.scheduler.examples.FibonacciExample 35
 
+# Other runtime examples
+java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+     -cp target/classes \
+     org.heartbeat.scheduler.examples.ParallelSumExample 100000
+java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+     -cp target/classes \
+     org.heartbeat.scheduler.examples.RecursiveSumExample 100000
+
 # Run benchmarks (generates docs/results/jmh-results.json)
 mvn test-compile exec:java -Pbenchmarks
 
@@ -107,6 +115,8 @@ The paper's compile-time transformation — inserting poll points so that every 
    - **Method entry** — the first basic block always polls before doing real work.
    - **Loop backedges** — identified via dominator-tree analysis (`BackedgeAnalyzer`):
      edge (u → v) is a backedge iff v dominates u in the CFG.
+     The CFG models ordinary jumps plus `TABLESWITCH` and `LOOKUPSWITCH`
+     targets, and stores dominator sets as `BitSet`s.
 
 **Controlling poll density** — `@HeartbeatPoll(every=N)` on a method inserts a backedge poll only at every N-th backedge (0-indexed, ascending order).  The entry poll is always present.  Use this to reduce instrumentation overhead in tight inner loops where the heartbeat timer fires far less frequently than every iteration:
 
@@ -160,7 +170,7 @@ Three JFR custom events are emitted at key points in the scheduler lifecycle:
 | `PollCheckEvent` | `checkHeartbeat()` decides to promote | total polls, total promotions |
 | `JoinBlockedEvent` | A parent parks waiting for a promoted child | carrier name, task age (ns) |
 
-Events are gated behind `jfr.isEnabled()` so the fast path (JFR disabled) allocates nothing.
+The default `HeartbeatObserver.NOOP` keeps the runtime decoupled from JFR and emits nothing.  When `JfrHeartbeatObserver` is configured, each JFR event checks `isEnabled()` before filling fields, beginning duration events, or committing.
 
 The observability backend is pluggable via `HeartbeatObserver`.  The default is `HeartbeatObserver.NOOP`; opt in to JFR by passing `JfrHeartbeatObserver.INSTANCE`:
 
@@ -171,7 +181,7 @@ HeartbeatConfig config = HeartbeatConfig.newBuilder()
     .build();
 ```
 
-Visualise a recording with `scripts/visualize-jfr.py` (produces a Gantt-style chart of promotions per carrier thread over time).
+Visualise a recording with `scripts/visualize-jfr.py` (produces a Gantt-style chart of promotions per carrier thread over time).  The recording must come from a run configured with `JfrHeartbeatObserver.INSTANCE`; the script exits non-zero if the recording contains no heartbeat events so CI does not silently accept an empty chart.
 
 ---
 
@@ -179,7 +189,7 @@ Visualise a recording with `scripts/visualize-jfr.py` (produces a Gantt-style ch
 
 ### Why backedges + method entries suffice
 
-The paper proves (§3) that inserting polls at loop backedges and recursive call sites is sufficient to make code PRC.  Every cycle in the CFG passes through a backedge; every recursive descent passes through a method entry.  Any execution path of length N must traverse one of these points.
+The paper proves (§3) that inserting polls at loop backedges and recursive call sites is sufficient to make code PRC.  Every natural loop in the CFG passes through a backedge; every recursive descent passes through a method entry.  Any execution path of length N must traverse one of these points.  The JVM analyzer handles `GOTO`, conditional jumps, `TABLESWITCH`, and `LOOKUPSWITCH`; exception-handler edges and irreducible CFGs are documented test cases rather than optimized paths.
 
 ### Running the bounds sweep
 
@@ -200,7 +210,7 @@ With large N (N = 100τ, theoretical 1% overhead) points converge toward y = 1.
 ### Scalability curves
 
 `ComparativeBench` compares heartbeat vs `ForkJoinPool` vs sequential on Fibonacci(35)
-across carrier-thread counts {1, 2, 4, 8}:
+while sweeping {1, 2, 4, 8} for the direct `ForkJoinPool` baseline:
 
 ```bash
 mvn test-compile exec:java -Pbenchmarks \
@@ -209,6 +219,8 @@ mvn test-compile exec:java -Pbenchmarks \
 python scripts/plot-results.py docs/results/comparative.json --type scalability
 # → docs/results/scalability.png
 ```
+
+The heartbeat executor uses `Executors.newVirtualThreadPerTaskExecutor()`, so its carrier count is controlled by Loom's JVM-global `-Djdk.virtualThreadScheduler.parallelism=N`, not by an executor-local setting.
 
 > **Results are generated locally** — run the commands above to produce the plots.
 > The scripts are ready; the `docs/results/` directory holds the output.
@@ -226,15 +238,16 @@ python scripts/plot-results.py docs/results/comparative.json --type scalability
 | @Parallel / @HeartbeatPoll annotations | ✅ done |
 | JFR custom events: PromotionEvent, PollCheckEvent, JoinBlockedEvent | ✅ done |
 | JFR visualizer: scripts/visualize-jfr.py | ✅ done |
-| Pluggable HeartbeatObserver (NOOP / JfrHeartbeatObserver); isEnabled() gating on hot path | ✅ done |
+| Pluggable HeartbeatObserver (NOOP / JfrHeartbeatObserver); JFR `isEnabled()` checks before event work | ✅ done |
 | JMH benchmark suite: FibBench, QuicksortBench, MatmulBench, BfsBench | ✅ done |
 | Shared AbstractHeartbeatBench base + bench/Tasks.java (calibrated config, no duplication) | ✅ done |
 | Bounds-verification benchmark (BoundsBench, τ/N sweep) | ✅ done |
 | Comparative benchmark harness (ComparativeBench) | ✅ done |
 | Result plotting: scripts/plot-results.py | ✅ done |
 | @HeartbeatPoll(every=N) wired into PrcRewriter; ASM 9.9.1; catch(Throwable) in transformer | ✅ done |
+| Code-review polish: BitSet dominators, switch backedges, bootstrap/platform loader skips, empty-JFR failure, Surefire fork timeout | ✅ done |
 | Custom Chase-Lev work-stealing deque | ❌ not done (delegated to Loom — see docs/loom-integration.md) |
-| DSL frontend (Cilk-Lite surface language) | ❌ not done (sketched in §9 of PORTFOLIO_PLAN.md) |
+| DSL frontend (Cilk-Lite surface language) | ❌ not done |
 | Annotation processor (AOT path) | ❌ not done (agent path is sufficient; AOT deferred) |
 
 ---
