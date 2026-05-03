@@ -6,6 +6,7 @@ import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,22 +55,22 @@ public class BackedgeAnalyzer {
 
         // Build CFG: for each instruction index, the set of successor indices.
         int n = insns.size();
-        List<Set<Integer>> succs = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) succs.add(new HashSet<>());
+        List<BitSet> succs = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) succs.add(new BitSet(n));
 
         for (int i = 0; i < n; i++) {
             AbstractInsnNode insn = insns.get(i);
             int op = insn.getOpcode();
             if (op == -1) {
                 // pseudo-instruction (label, frame, line): fall through
-                if (i + 1 < n) succs.get(i).add(i + 1);
+                if (i + 1 < n) succs.get(i).set(i + 1);
                 continue;
             }
             // Unconditional jumps
             if (op == GOTO) {
                 LabelNode target = ((JumpInsnNode) insn).label;
                 Integer ti = labelIndex.get(target);
-                if (ti != null) succs.get(i).add(ti);
+                if (ti != null) succs.get(i).set(ti);
                 // no fall-through
                 continue;
             }
@@ -81,38 +82,38 @@ public class BackedgeAnalyzer {
             // Conditional jumps
             if (insn instanceof JumpInsnNode ji) {
                 Integer ti = labelIndex.get(ji.label);
-                if (ti != null) succs.get(i).add(ti);
+                if (ti != null) succs.get(i).set(ti);
                 // fall-through
-                if (i + 1 < n) succs.get(i).add(i + 1);
+                if (i + 1 < n) succs.get(i).set(i + 1);
                 continue;
             }
             // Everything else falls through
-            if (i + 1 < n) succs.get(i).add(i + 1);
+            if (i + 1 < n) succs.get(i).set(i + 1);
         }
 
         // Compute dominators using the iterative bit-set algorithm.
         // dom[i] = set of nodes that dominate node i.
         // dom[0] = {0}; dom[i] = {i} ∪ (∩ dom[p] for p in preds[i])
-        // We represent dom as a List<Set<Integer>> for clarity; for large methods
-        // a bit-set would be faster but method sizes are small.
 
         // Build predecessor list
-        List<Set<Integer>> preds = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) preds.add(new HashSet<>());
+        List<BitSet> preds = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) preds.add(new BitSet(n));
         for (int i = 0; i < n; i++) {
-            for (int s : succs.get(i)) preds.get(s).add(i);
+            for (int s = succs.get(i).nextSetBit(0); s >= 0; s = succs.get(i).nextSetBit(s + 1)) {
+                preds.get(s).set(i);
+            }
         }
 
         // Initialise doms
-        List<Set<Integer>> dom = new ArrayList<>(n);
+        List<BitSet> dom = new ArrayList<>(n);
         // Entry: dom[0] = {0}
-        Set<Integer> entry = new HashSet<>();
-        entry.add(0);
+        BitSet entry = new BitSet(n);
+        entry.set(0);
         dom.add(entry);
         // All others: dom[i] = universe (all nodes)
         for (int i = 1; i < n; i++) {
-            Set<Integer> all = new HashSet<>();
-            for (int j = 0; j < n; j++) all.add(j);
+            BitSet all = new BitSet(n);
+            all.set(0, n);
             dom.add(all);
         }
 
@@ -121,16 +122,16 @@ public class BackedgeAnalyzer {
         while (changed) {
             changed = false;
             for (int i = 1; i < n; i++) {
-                Set<Integer> newDom = null;
-                for (int p : preds.get(i)) {
+                BitSet newDom = null;
+                for (int p = preds.get(i).nextSetBit(0); p >= 0; p = preds.get(i).nextSetBit(p + 1)) {
                     if (newDom == null) {
-                        newDom = new HashSet<>(dom.get(p));
+                        newDom = (BitSet) dom.get(p).clone();
                     } else {
-                        newDom.retainAll(dom.get(p));
+                        newDom.and(dom.get(p));
                     }
                 }
-                if (newDom == null) newDom = new HashSet<>();
-                newDom.add(i);
+                if (newDom == null) newDom = new BitSet(n);
+                newDom.set(i);
                 if (!newDom.equals(dom.get(i))) {
                     dom.set(i, newDom);
                     changed = true;
@@ -146,7 +147,7 @@ public class BackedgeAnalyzer {
             if (!(insn instanceof JumpInsnNode ji)) continue;
             Integer ti = labelIndex.get(ji.label);
             if (ti == null) continue;
-            if (dom.get(i).contains(ti)) {
+            if (dom.get(i).get(ti)) {
                 backedges.add(i);
             }
         }
