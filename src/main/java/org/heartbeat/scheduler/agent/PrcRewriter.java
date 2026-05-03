@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.agent;
 
+import org.heartbeat.scheduler.core.HeartbeatContext;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -11,6 +12,9 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import java.io.Serializable;
+import java.lang.invoke.SerializedLambda;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -37,10 +41,11 @@ public class PrcRewriter {
             "Lorg/heartbeat/scheduler/annotations/HeartbeatPoll;";
 
     /** The static poll method the rewriter injects calls to. */
-    static final String CONTEXT_OWNER =
-            "org/heartbeat/scheduler/core/HeartbeatContext";
-    static final String CHECK_METHOD = "checkHeartbeatStatic";
-    static final String CHECK_DESC   = "()Z";
+    private static final PollTarget CHECK_HEARTBEAT =
+            PollTarget.from(HeartbeatContext::checkHeartbeatStatic);
+    static final String CONTEXT_OWNER = CHECK_HEARTBEAT.owner();
+    static final String CHECK_METHOD = CHECK_HEARTBEAT.name();
+    static final String CHECK_DESC = CHECK_HEARTBEAT.descriptor();
 
     // -------------------------------------------------------------------------
 
@@ -188,5 +193,34 @@ public class PrcRewriter {
                 false));
         il.add(new InsnNode(Opcodes.POP));
         return il;
+    }
+
+    @FunctionalInterface
+    private interface PollProbe extends Serializable {
+        boolean invoke();
+    }
+
+    private record PollTarget(String owner, String name, String descriptor) {
+        static PollTarget from(PollProbe probe) {
+            SerializedLambda lambda = serializedLambda(probe);
+            return new PollTarget(
+                    lambda.getImplClass(),
+                    lambda.getImplMethodName(),
+                    lambda.getImplMethodSignature());
+        }
+
+        private static SerializedLambda serializedLambda(PollProbe probe) {
+            try {
+                Method writeReplace = probe.getClass().getDeclaredMethod("writeReplace");
+                writeReplace.setAccessible(true);
+                Object replacement = writeReplace.invoke(probe);
+                if (replacement instanceof SerializedLambda lambda) {
+                    return lambda;
+                }
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Unable to resolve PRC poll target", e);
+            }
+            throw new IllegalStateException("PRC poll target did not serialize to a lambda");
+        }
     }
 }
