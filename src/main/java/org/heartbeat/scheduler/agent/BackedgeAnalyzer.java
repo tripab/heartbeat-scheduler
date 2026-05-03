@@ -3,7 +3,9 @@ package org.heartbeat.scheduler.agent;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -76,9 +78,20 @@ public class BackedgeAnalyzer {
             }
             // Returns and throws — no successors
             if (isReturn(op) || op == ATHROW) continue;
-            // Table/lookup switch — handled via non-JumpInsnNode; fall through for now
-            // (loops through switch are rare in heartbeat-annotated code; we conservatively
-            // skip them here — the poll at method entry is always present regardless)
+            if (insn instanceof LookupSwitchInsnNode lookupSwitch) {
+                addLabelSuccessor(succs.get(i), labelIndex, lookupSwitch.dflt);
+                for (LabelNode label : lookupSwitch.labels) {
+                    addLabelSuccessor(succs.get(i), labelIndex, label);
+                }
+                continue;
+            }
+            if (insn instanceof TableSwitchInsnNode tableSwitch) {
+                addLabelSuccessor(succs.get(i), labelIndex, tableSwitch.dflt);
+                for (LabelNode label : tableSwitch.labels) {
+                    addLabelSuccessor(succs.get(i), labelIndex, label);
+                }
+                continue;
+            }
             // Conditional jumps
             if (insn instanceof JumpInsnNode ji) {
                 Integer ti = labelIndex.get(ji.label);
@@ -139,15 +152,12 @@ public class BackedgeAnalyzer {
             }
         }
 
-        // Collect backedge indices: a jump at index i to target t is a backedge
+        // Collect backedge indices: a branch at index i to target t is a backedge
         // iff t ∈ dom[i] (target dominates source).
         Set<Integer> backedges = new HashSet<>();
         for (int i = 0; i < n; i++) {
             AbstractInsnNode insn = insns.get(i);
-            if (!(insn instanceof JumpInsnNode ji)) continue;
-            Integer ti = labelIndex.get(ji.label);
-            if (ti == null) continue;
-            if (dom.get(i).get(ti)) {
+            if (isBackedgeJump(insn, dom.get(i), labelIndex)) {
                 backedges.add(i);
             }
         }
@@ -160,6 +170,41 @@ public class BackedgeAnalyzer {
         List<AbstractInsnNode> list = new ArrayList<>();
         for (AbstractInsnNode insn : mn.instructions) list.add(insn);
         return list;
+    }
+
+    private static void addLabelSuccessor(BitSet succs, Map<LabelNode, Integer> labelIndex, LabelNode label) {
+        Integer target = labelIndex.get(label);
+        if (target != null) succs.set(target);
+    }
+
+    private static boolean isBackedgeJump(
+            AbstractInsnNode insn,
+            BitSet sourceDom,
+            Map<LabelNode, Integer> labelIndex) {
+        if (insn instanceof JumpInsnNode jump) {
+            return targetDominatesSource(sourceDom, labelIndex, jump.label);
+        }
+        if (insn instanceof LookupSwitchInsnNode lookupSwitch) {
+            if (targetDominatesSource(sourceDom, labelIndex, lookupSwitch.dflt)) return true;
+            for (LabelNode label : lookupSwitch.labels) {
+                if (targetDominatesSource(sourceDom, labelIndex, label)) return true;
+            }
+        }
+        if (insn instanceof TableSwitchInsnNode tableSwitch) {
+            if (targetDominatesSource(sourceDom, labelIndex, tableSwitch.dflt)) return true;
+            for (LabelNode label : tableSwitch.labels) {
+                if (targetDominatesSource(sourceDom, labelIndex, label)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean targetDominatesSource(
+            BitSet sourceDom,
+            Map<LabelNode, Integer> labelIndex,
+            LabelNode label) {
+        Integer target = labelIndex.get(label);
+        return target != null && sourceDom.get(target);
     }
 
     private static boolean isReturn(int op) {

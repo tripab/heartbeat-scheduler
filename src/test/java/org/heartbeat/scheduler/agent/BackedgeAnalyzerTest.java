@@ -155,9 +155,8 @@ class BackedgeAnalyzerTest {
     }
 
     /**
-     * LOOKUPSWITCH is not a JumpInsnNode; its case-label edges are not modelled
-     * in the CFG. A pure dispatch (all forward targets, no loops) yields no
-     * backedges — this is the "switch elision" behaviour noted in BackedgeAnalyzer.
+     * LOOKUPSWITCH case-label edges are modelled in the CFG. A pure dispatch
+     * with all forward targets still yields no backedges.
      */
     @Test
     void lookupSwitchNoBackedges() {
@@ -179,6 +178,52 @@ class BackedgeAnalyzerTest {
         mn.instructions.add(new InsnNode(RETURN));
 
         assertThat(BackedgeAnalyzer.findBackedgeIndices(mn)).isEmpty();
+    }
+
+    /** LOOKUPSWITCH with a case target back to the loop header is a backedge. */
+    @Test
+    void lookupSwitchBackToDominatingHeaderIsBackedge() {
+        MethodNode mn = new MethodNode(0, "test", "(I)V", null, null);
+        LabelNode loopHeader = new LabelNode();
+        LabelNode end = new LabelNode();
+
+        mn.instructions.add(new InsnNode(ICONST_0));
+        mn.instructions.add(loopHeader);
+        mn.instructions.add(new VarInsnNode(ILOAD, 1));
+        LookupSwitchInsnNode lookupSwitch = new LookupSwitchInsnNode(
+                end,
+                new int[]{0},
+                new LabelNode[]{loopHeader});
+        mn.instructions.add(lookupSwitch);
+        mn.instructions.add(end);
+        mn.instructions.add(new InsnNode(RETURN));
+
+        Set<Integer> backedges = BackedgeAnalyzer.findBackedgeIndices(mn);
+        assertThat(backedges).containsExactly(indexOf(mn, lookupSwitch));
+    }
+
+    /** TABLESWITCH with a case target back to the loop header is a backedge. */
+    @Test
+    void tableSwitchBackToDominatingHeaderIsBackedge() {
+        MethodNode mn = new MethodNode(0, "test", "(I)V", null, null);
+        LabelNode loopHeader = new LabelNode();
+        LabelNode end = new LabelNode();
+
+        mn.instructions.add(new InsnNode(ICONST_0));
+        mn.instructions.add(loopHeader);
+        mn.instructions.add(new VarInsnNode(ILOAD, 1));
+        TableSwitchInsnNode tableSwitch = new TableSwitchInsnNode(
+                0,
+                1,
+                end,
+                loopHeader,
+                end);
+        mn.instructions.add(tableSwitch);
+        mn.instructions.add(end);
+        mn.instructions.add(new InsnNode(RETURN));
+
+        Set<Integer> backedges = BackedgeAnalyzer.findBackedgeIndices(mn);
+        assertThat(backedges).containsExactly(indexOf(mn, tableSwitch));
     }
 
     /**
