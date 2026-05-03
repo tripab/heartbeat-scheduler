@@ -6,6 +6,7 @@ import org.heartbeat.scheduler.core.HeartbeatContext;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
 import org.heartbeat.scheduler.task.HeartbeatTask;
 import org.heartbeat.scheduler.testutil.TestConfig;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -28,6 +29,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  *    correct results when run through VirtualThreadExecutor.
  */
 class AgentIntegrationTest {
+
+    @AfterEach
+    void clearHeartbeatContext() {
+        HeartbeatContext.clearCurrent();
+    }
 
     // -------------------------------------------------------------------------
     // 1. checkHeartbeatStatic() is safe outside executor
