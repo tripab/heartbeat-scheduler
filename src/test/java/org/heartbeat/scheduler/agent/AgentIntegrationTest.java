@@ -157,6 +157,29 @@ class AgentIntegrationTest {
     }
 
     @Test
+    void rewrittenClassMatchesUninstrumentedResults() throws Exception {
+        String internalName = "SyntheticWorkerForDifferentialTest";
+        byte[] original = buildSyntheticWorkerClass(internalName);
+
+        PrcRewriter rewriter = new PrcRewriter();
+        byte[] rewritten = rewriter.rewrite(original, null);
+
+        String className = internalName.replace('/', '.');
+        Method originalCountDown = new SingleClassLoader(className, original)
+                .loadClass(className)
+                .getMethod("countDown", int.class);
+        Method rewrittenCountDown = new SingleClassLoader(className, rewritten)
+                .loadClass(className)
+                .getMethod("countDown", int.class);
+
+        for (int n : new int[]{0, 1, 2, 10, 100}) {
+            assertThat(rewrittenCountDown.invoke(null, n))
+                    .as("instrumented result should match original for n=%d", n)
+                    .isEqualTo(originalCountDown.invoke(null, n));
+        }
+    }
+
+    @Test
     void rewrittenClassPollsInsertedAtEntryAndBackedge() throws Exception {
         String internalName = "SyntheticWorkerForPollCount";
         byte[] original = buildSyntheticWorkerClass(internalName);

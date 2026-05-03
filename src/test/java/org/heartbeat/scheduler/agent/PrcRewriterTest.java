@@ -277,6 +277,38 @@ class PrcRewriterTest {
                 .isGreaterThanOrEqualTo(2);
     }
 
+    /** Rewriting an already rewritten class does not add duplicate poll sites. */
+    @Test
+    void rewriteIsIdempotentForExistingPollSites() {
+        byte[] original = buildFixtureClass("TestIdempotentLoop", mv -> {
+            mv.visitCode();
+            org.objectweb.asm.Label check = new org.objectweb.asm.Label();
+            org.objectweb.asm.Label end = new org.objectweb.asm.Label();
+            mv.visitInsn(Opcodes.ICONST_0);
+            mv.visitVarInsn(Opcodes.ISTORE, 0);
+            mv.visitLabel(check);
+            mv.visitVarInsn(Opcodes.ILOAD, 0);
+            mv.visitIntInsn(Opcodes.BIPUSH, 10);
+            mv.visitJumpInsn(Opcodes.IF_ICMPGE, end);
+            mv.visitIincInsn(0, 1);
+            mv.visitJumpInsn(Opcodes.GOTO, check);
+            mv.visitLabel(end);
+            mv.visitInsn(Opcodes.RETURN);
+            mv.visitMaxs(2, 1);
+        });
+
+        byte[] once = rewriter.rewrite(original, null);
+        byte[] twice = rewriter.rewrite(once, null);
+
+        assertVerifies(once);
+        assertVerifies(twice);
+        assertEntryPollPresent(twice, "parallelMethod");
+        assertBackedgePollCoverage(original, twice, "parallelMethod", 1, 1);
+        assertThat(countPolls(twice, "parallelMethod"))
+                .as("second rewrite should not duplicate existing entry/backedge polls")
+                .isEqualTo(countPolls(once, "parallelMethod"));
+    }
+
     /** A method with nested loops gets entry + one poll per backedge. */
     @Test
     void nestedLoopsAllBackedgesInstrumented() {

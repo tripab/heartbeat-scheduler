@@ -100,6 +100,8 @@ public class PrcRewriter {
      * Insert poll calls into a single method.
      *
      * Strategy: insert before each selected backedge jump and at method entry.
+     * Existing poll sites are left untouched, so running the rewriter more
+     * than once does not keep stacking duplicate polls.
      * We insert a poll that returns a boolean but we discard the value (POP).
      * The actual promotion side-effect happens inside checkHeartbeatStatic()
      * via HeartbeatTask.yield().
@@ -129,7 +131,9 @@ public class PrcRewriter {
         }
         selected.sort(Comparator.reverseOrder());
         for (int idx : selected) {
-            mn.instructions.insertBefore(insns[idx], pollSequence());
+            if (!hasPollImmediatelyBefore(insns[idx])) {
+                mn.instructions.insertBefore(insns[idx], pollSequence());
+            }
         }
 
         // Prepend entry poll (after any initial labels/frames so debuggers see the entry).
@@ -138,7 +142,9 @@ public class PrcRewriter {
             first = first.getNext();
         }
         if (first != null) {
-            mn.instructions.insertBefore(first, pollSequence());
+            if (!startsWithPoll(first)) {
+                mn.instructions.insertBefore(first, pollSequence());
+            }
         } else {
             mn.instructions.insert(pollSequence());
         }
@@ -193,6 +199,41 @@ public class PrcRewriter {
                 false));
         il.add(new InsnNode(Opcodes.POP));
         return il;
+    }
+
+    private static boolean startsWithPoll(AbstractInsnNode firstRealInsn) {
+        return isPollCall(firstRealInsn)
+                && nextRealInstruction(firstRealInsn.getNext()) instanceof InsnNode pop
+                && pop.getOpcode() == Opcodes.POP;
+    }
+
+    private static boolean hasPollImmediatelyBefore(AbstractInsnNode insn) {
+        AbstractInsnNode before = previousRealInstruction(insn.getPrevious());
+        return before instanceof InsnNode pop
+                && pop.getOpcode() == Opcodes.POP
+                && isPollCall(previousRealInstruction(before.getPrevious()));
+    }
+
+    private static boolean isPollCall(AbstractInsnNode insn) {
+        return insn instanceof MethodInsnNode mi
+                && mi.getOpcode() == Opcodes.INVOKESTATIC
+                && CONTEXT_OWNER.equals(mi.owner)
+                && CHECK_METHOD.equals(mi.name)
+                && CHECK_DESC.equals(mi.desc);
+    }
+
+    private static AbstractInsnNode previousRealInstruction(AbstractInsnNode insn) {
+        while (insn != null && insn.getOpcode() == -1) {
+            insn = insn.getPrevious();
+        }
+        return insn;
+    }
+
+    private static AbstractInsnNode nextRealInstruction(AbstractInsnNode insn) {
+        while (insn != null && insn.getOpcode() == -1) {
+            insn = insn.getNext();
+        }
+        return insn;
     }
 
     @FunctionalInterface
