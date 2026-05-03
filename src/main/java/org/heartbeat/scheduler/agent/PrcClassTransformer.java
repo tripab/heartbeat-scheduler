@@ -46,7 +46,7 @@ public class PrcClassTransformer implements ClassFileTransformer {
             }
             // Return null when unmodified — ClassFileTransformer contract: null = no change.
             return result == classfileBuffer ? null : result;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             System.err.println("[PrcAgent] Failed to instrument " + className + ": " + e);
             return null;
         }
