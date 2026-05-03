@@ -108,6 +108,14 @@ The paper's compile-time transformation — inserting poll points so that every 
    - **Loop backedges** — identified via dominator-tree analysis (`BackedgeAnalyzer`):
      edge (u → v) is a backedge iff v dominates u in the CFG.
 
+**Controlling poll density** — `@HeartbeatPoll(every=N)` on a method inserts a backedge poll only at every N-th backedge (0-indexed, ascending order).  The entry poll is always present.  Use this to reduce instrumentation overhead in tight inner loops where the heartbeat timer fires far less frequently than every iteration:
+
+```java
+@Parallel
+@HeartbeatPoll(every = 4)   // poll at backedges 0, 4, 8, … instead of every one
+public void tightLoop(int[] arr) { … }
+```
+
 **Before / after example** — a `@Parallel` method with a loop:
 
 ```
@@ -139,6 +147,31 @@ GOTO L1
 `ClassWriter.COMPUTE_FRAMES` regenerates `StackMapTable` entries automatically, avoiding the most common bytecode-rewriting pitfall.
 
 Full design rationale in [`docs/prc-rewriter.md`](docs/prc-rewriter.md).
+
+---
+
+## Observability
+
+Three JFR custom events are emitted at key points in the scheduler lifecycle:
+
+| Event | When fired | Key fields |
+|---|---|---|
+| `PromotionEvent` | A task is promoted to a virtual thread | carrier name, frame age (ns), frames in-flight |
+| `PollCheckEvent` | `checkHeartbeat()` decides to promote | total polls, total promotions |
+| `JoinBlockedEvent` | A parent parks waiting for a promoted child | carrier name, task age (ns) |
+
+Events are gated behind `jfr.isEnabled()` so the fast path (JFR disabled) allocates nothing.
+
+The observability backend is pluggable via `HeartbeatObserver`.  The default is `HeartbeatObserver.NOOP`; opt in to JFR by passing `JfrHeartbeatObserver.INSTANCE`:
+
+```java
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+    …
+    .observer(JfrHeartbeatObserver.INSTANCE)
+    .build();
+```
+
+Visualise a recording with `scripts/visualize-jfr.py` (produces a Gantt-style chart of promotions per carrier thread over time).
 
 ---
 
@@ -193,10 +226,13 @@ python scripts/plot-results.py docs/results/comparative.json --type scalability
 | @Parallel / @HeartbeatPoll annotations | ✅ done |
 | JFR custom events: PromotionEvent, PollCheckEvent, JoinBlockedEvent | ✅ done |
 | JFR visualizer: scripts/visualize-jfr.py | ✅ done |
+| Pluggable HeartbeatObserver (NOOP / JfrHeartbeatObserver); isEnabled() gating on hot path | ✅ done |
 | JMH benchmark suite: FibBench, QuicksortBench, MatmulBench, BfsBench | ✅ done |
+| Shared AbstractHeartbeatBench base + bench/Tasks.java (calibrated config, no duplication) | ✅ done |
 | Bounds-verification benchmark (BoundsBench, τ/N sweep) | ✅ done |
 | Comparative benchmark harness (ComparativeBench) | ✅ done |
 | Result plotting: scripts/plot-results.py | ✅ done |
+| @HeartbeatPoll(every=N) wired into PrcRewriter; ASM 9.9.1; catch(Throwable) in transformer | ✅ done |
 | Custom Chase-Lev work-stealing deque | ❌ not done (delegated to Loom — see docs/loom-integration.md) |
 | DSL frontend (Cilk-Lite surface language) | ❌ not done (sketched in §9 of PORTFOLIO_PLAN.md) |
 | Annotation processor (AOT path) | ❌ not done (agent path is sufficient; AOT deferred) |
@@ -206,18 +242,28 @@ python scripts/plot-results.py docs/results/comparative.json --type scalability
 ## Configuration reference
 
 ```java
+// Recommended: machine-calibrated τ measured at startup
+TimingCalibration.CalibrationResults cal = TimingCalibration.calibrate();
+
 HeartbeatConfig config = HeartbeatConfig.newBuilder()
-    .heartbeatPeriodMicros(30)   // N — time between promotions (μs)
-    .promotionCostMicros(2)      // τ — estimated virtual-thread creation cost
-    .numCarrierThreads(8)        // hint — actual carrier count depends on Loom
-    .pollingStrategyFactory(() -> TimeBasedPolling.forHeartbeatPeriod(30_000))
+    .heartbeatPeriodNanos(cal.recommendedHeartbeatPeriod())  // 20τ → ~5% overhead
+    .promotionCostNanos(cal.promotionCost())                 // τ measured on this JVM
+    .numCarrierThreads(8)
     .enableStatistics(true)
     .build();
 
 // Or target a specific overhead percentage (computes N = (100/k) × τ):
 HeartbeatConfig config = HeartbeatConfig.newBuilder()
-    .promotionCostMicros(2)
-    .targetOverheadPercent(5.0)  // N = 20τ = 40μs
+    .promotionCostNanos(cal.promotionCost())
+    .targetOverheadPercent(5.0)   // N = 20τ
+    .build();
+
+// Or with explicit time-based polling (fires a timer check every N nanos):
+HeartbeatConfig config = HeartbeatConfig.newBuilder()
+    .heartbeatPeriodNanos(cal.recommendedHeartbeatPeriod())
+    .promotionCostNanos(cal.promotionCost())
+    .pollingStrategyFactory(() -> TimeBasedPolling.forHeartbeatPeriod(
+            cal.recommendedHeartbeatPeriod()))
     .build();
 ```
 
