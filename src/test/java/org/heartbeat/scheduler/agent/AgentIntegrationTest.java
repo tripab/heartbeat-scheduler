@@ -1,5 +1,6 @@
 package org.heartbeat.scheduler.agent;
 
+import org.heartbeat.scheduler.core.CountBasedPolling;
 import org.heartbeat.scheduler.core.HeartbeatConfig;
 import org.heartbeat.scheduler.core.HeartbeatContext;
 import org.heartbeat.scheduler.executor.VirtualThreadExecutor;
@@ -12,9 +13,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.Method;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -35,7 +34,7 @@ class AgentIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void checkHeartbeatStatic_noContext_returnsFalse() {
+    void checkHeartbeatStaticNoContextReturnsFalse() {
         // Must be safe to call from any thread with no context installed.
         assertThatCode(() -> {
             boolean result = HeartbeatContext.checkHeartbeatStatic();
@@ -48,24 +47,16 @@ class AgentIntegrationTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void checkHeartbeatStatic_withContext_delegatesToCheckHeartbeat() {
-        HeartbeatConfig config = HeartbeatConfig.newBuilder()
-                .heartbeatPeriodMicros(10)  // short period — promotes quickly
-                .promotionCostMicros(1)
-                .build();
-        HeartbeatContext ctx = new HeartbeatContext(config, config.createPollingStrategy());
+    void checkHeartbeatStaticWithContextDelegatesToCheckHeartbeat() {
+        // aggressiveBuilder() gives a machine-calibrated period of max(2τ, 2ns) which is
+        // guaranteed to be elapsed before the first check. CountBasedPolling.every(1)
+        // ensures shouldPoll() is true on the first invocation.
+        HeartbeatConfig config = TestConfig.aggressiveBuilder().build();
+        HeartbeatContext ctx = new HeartbeatContext(config, CountBasedPolling.every(1));
         HeartbeatContext.setCurrent(ctx);
         try {
-            // Spin until the timer fires; checkHeartbeatStatic should return true at some point.
-            boolean sawPromotion = false;
-            for (int i = 0; i < 100_000; i++) {
-                if (HeartbeatContext.checkHeartbeatStatic()) {
-                    sawPromotion = true;
-                    break;
-                }
-            }
-            assertThat(sawPromotion)
-                    .as("checkHeartbeatStatic() should return true once heartbeat period elapses")
+            assertThat(HeartbeatContext.checkHeartbeatStatic())
+                    .as("checkHeartbeatStatic() must return true when timer period has elapsed")
                     .isTrue();
         } finally {
             HeartbeatContext.clearCurrent();
@@ -141,7 +132,7 @@ class AgentIntegrationTest {
     }
 
     @Test
-    void rewrittenClass_producesCorrectResult() throws Exception {
+    void rewrittenClassProducesCorrectResult() throws Exception {
         String internalName = "SyntheticWorkerForTest";
         byte[] original = buildSyntheticWorkerClass(internalName);
 
@@ -165,7 +156,7 @@ class AgentIntegrationTest {
     }
 
     @Test
-    void rewrittenClass_pollsInsertedAtEntryAndBackedge() throws Exception {
+    void rewrittenClassPollsInsertedAtEntryAndBackedge() throws Exception {
         String internalName = "SyntheticWorkerForPollCount";
         byte[] original = buildSyntheticWorkerClass(internalName);
 
@@ -204,7 +195,7 @@ class AgentIntegrationTest {
      * before the computation completes.
      */
     @Test
-    void promotableTask_triggersPromotions_underExecutor() throws Exception {
+    void promotableTaskTriggersPromotionsUnderExecutor() throws Exception {
         HeartbeatConfig config = TestConfig.aggressiveBuilder()
                 .enableStatistics(true)
                 .build();
