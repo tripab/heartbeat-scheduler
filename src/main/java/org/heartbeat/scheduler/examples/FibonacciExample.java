@@ -21,6 +21,7 @@ public final class FibonacciExample {
 
     private static final int DEFAULT_N = 20;
     private static final int MAX_N = 45;
+    private static final int SEQUENTIAL_CUTOFF = 20;
 
     private FibonacciExample() {}
 
@@ -34,7 +35,10 @@ public final class FibonacciExample {
         var config = ExamplesSupport.defaultHeartbeatConfig();
 
         System.out.println(config);
-        System.out.printf("Computing fib(%d) with heartbeat scheduling...%n", n);
+        System.out.printf(
+                "Computing fib(%d) with heartbeat scheduling (sequential cutoff=%d)...%n",
+                n,
+                SEQUENTIAL_CUTOFF);
 
         try (VirtualThreadExecutor executor = new VirtualThreadExecutor(config)) {
             long start = System.nanoTime();
@@ -57,12 +61,17 @@ public final class FibonacciExample {
         @Override
         @Parallel
         protected Long compute() {
-            if (n <= 1) return (long) n;
+            if (n <= SEQUENTIAL_CUTOFF) return sequentialFib(n);
             FibTask f1 = new FibTask(n - 1);
             FibTask f2 = new FibTask(n - 2);
             fork(f1);
             fork(f2);
             return join(f1) + join(f2);
         }
+    }
+
+    private static long sequentialFib(int n) {
+        if (n <= 1) return n;
+        return sequentialFib(n - 1) + sequentialFib(n - 2);
     }
 }

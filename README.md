@@ -59,7 +59,7 @@ The key insight: tasks start *sequential* and are promoted lazily only when the 
 # Build and run tests
 mvn clean test
 
-# Run the Fibonacci example (n=35)
+# Run the Fibonacci example (n=35; recursive tasks use a sequential leaf cutoff)
 java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
      -cp target/classes \
      org.heartbeat.scheduler.examples.FibonacciExample 35
