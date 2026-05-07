@@ -101,6 +101,25 @@ final class PbbsValidation {
         }
     }
 
+    static void requireValidSpanningForest(PbbsGraph graph, int[] parent) {
+        int vertexCount = graph.vertexCount();
+        int[][] adjacency = graph.adjacency();
+        if (parent.length != vertexCount) {
+            throw new IllegalStateException("spanning forest parent length mismatch");
+        }
+
+        for (int vertex = 0; vertex < vertexCount; vertex++) {
+            int predecessor = parent[vertex];
+            if (predecessor < 0 || predecessor >= vertexCount) {
+                throw new IllegalStateException("spanning forest parent out of range");
+            }
+            if (predecessor != vertex && !hasEdge(adjacency[predecessor], vertex)) {
+                throw new IllegalStateException("spanning forest parent edge is not in graph");
+            }
+            requireRootedParentChain(parent, vertex);
+        }
+    }
+
     static int[] sortedUnique(int[] values) {
         if (values.length == 0) {
             return new int[0];
@@ -114,5 +133,26 @@ final class PbbsValidation {
             }
         }
         return Arrays.copyOf(sorted, uniqueCount);
+    }
+
+    private static boolean hasEdge(int[] neighbors, int target) {
+        for (int neighbor : neighbors) {
+            if (neighbor == target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void requireRootedParentChain(int[] parent, int vertex) {
+        int cursor = vertex;
+        for (int depth = 0; depth <= parent.length; depth++) {
+            int predecessor = parent[cursor];
+            if (predecessor == cursor) {
+                return;
+            }
+            cursor = predecessor;
+        }
+        throw new IllegalStateException("spanning forest parent chain contains a cycle");
     }
 }
