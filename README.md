@@ -82,8 +82,11 @@ java --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
 # Run benchmarks (generates docs/results/jmh-results.json)
 mvn test-compile exec:java -Pbenchmarks
 
+# Run a tiny PBBS JMH smoke check (writes target/pbbs-smoke.json)
+scripts/run-pbbs-smoke.sh
+
 # Generate result plots (requires: pip install matplotlib)
-python scripts/plot-results.py docs/results/jmh-results.json
+python3 scripts/plot-results.py docs/results/jmh-results.json
 ```
 
 ---
@@ -222,6 +225,48 @@ python scripts/plot-results.py docs/results/comparative.json --type scalability
 
 The heartbeat executor uses `Executors.newVirtualThreadPerTaskExecutor()`, so its carrier count is controlled by Loom's JVM-global `-Djdk.virtualThreadScheduler.parallelism=N`, not by an executor-local setting.
 
+### PBBS-style Java benchmark subset
+
+`Pbbs*Bench` adds a staged PBBS-style suite under the existing JMH harness.  The current milestone implements five generated-input workloads:
+
+| Benchmark | Inputs | Validation |
+|---|---|---|
+| `PbbsRadixSortBench` | random ints, exponential-like ints, bounded random ints | sorted output and input multiset preservation |
+| `PbbsSampleSortBench` | random doubles, almost-sorted doubles | exact equality to sequential comparison-sort output |
+| `PbbsRemoveDuplicatesBench` | random ints, bounded random ints | sorted unique output and unique-set equality |
+| `PbbsConvexHullBench` | points in circle, on circle, Kuzmin-like clustered points | canonical hull vertices modulo set equality in tests |
+| `PbbsSpanningBench` | rMat-like, grid, random sparse directed graphs | valid spanning forest parent edges and parent-chain reachability |
+
+All PBBS benchmark classes expose the same Java modes:
+
+- `sequential(Blackhole bh)`
+- `forkJoinPool(Blackhole bh)`
+- `heartbeat(Blackhole bh)`
+
+Each class also exposes explicit JMH params for `size`, `distribution`, and `threshold`.  `threshold` is the task-granularity cutoff, so benchmark output records the tuning choice instead of hiding it in constants.  Inputs are generated in memory at `@Setup(Level.Trial)` from fixed seeds and copied before each timed method so mutable benchmark state is not shared across modes.
+
+Run the PBBS subset and plot it:
+
+```bash
+mvn test-compile exec:java -Pbenchmarks \
+  -Dexec.args="Pbbs.* -rf json -rff docs/results/pbbs.json"
+
+python3 scripts/plot-results.py docs/results/pbbs.json --type pbbs
+# → docs/results/pbbs-times.png
+# → docs/results/pbbs-heartbeat-vs-forkjoin.png
+```
+
+For a fast local harness check, run:
+
+```bash
+scripts/run-pbbs-smoke.sh
+# → target/pbbs-smoke.json
+```
+
+The smoke command intentionally uses tiny inputs, one measurement iteration, and an in-process JMH run.  It verifies that the benchmark harness starts and emits JSON; it is not a performance measurement.
+
+**Comparison scope:** the Java PBBS suite is for fair Java-vs-Java comparisons on the same JVM, data generators, validation logic, and JMH settings.  The PLDI paper's C++ PBBS tables are useful context for workload selection, but these Java results should not be read as wall-clock equivalents to the paper unless the original C++ Heartbeat/PBBS setup is run on the same hardware with matched methodology.  Important differences include Java allocation behavior, Loom virtual-thread promotion costs, generated small/medium inputs rather than full PBBS corpora, and JVM-global carrier parallelism via `-Djdk.virtualThreadScheduler.parallelism=N`.
+
 > **Results are generated locally** — run the commands above to produce the plots.
 > The scripts are ready; the `docs/results/` directory holds the output.
 
@@ -243,7 +288,9 @@ The heartbeat executor uses `Executors.newVirtualThreadPerTaskExecutor()`, so it
 | Shared AbstractHeartbeatBench base + bench/Tasks.java (calibrated config, no duplication) | ✅ done |
 | Bounds-verification benchmark (BoundsBench, τ/N sweep) | ✅ done |
 | Comparative benchmark harness (ComparativeBench) | ✅ done |
-| Result plotting: scripts/plot-results.py | ✅ done |
+| PBBS-style Java benchmark subset: radix sort, sample sort, remove duplicates, convex hull, spanning forest | ✅ done |
+| PBBS generated inputs, correctness tests, JMH smoke script | ✅ done |
+| Result plotting: scripts/plot-results.py (bounds, scalability, PBBS) | ✅ done |
 | @HeartbeatPoll(every=N) wired into PrcRewriter; ASM 9.9.1; catch(Throwable) in transformer | ✅ done |
 | Code-review polish: BitSet dominators, switch backedges, bootstrap/platform loader skips, empty-JFR failure, Surefire fork timeout | ✅ done |
 | Custom Chase-Lev work-stealing deque | ❌ not done (delegated to Loom — see docs/loom-integration.md) |
